@@ -1,0 +1,123 @@
+[
+  {
+    "_id": "6a142a8c44851db073c7d496",
+    "customerType": "individual",
+    "businessType": "distributor",
+    "displayName": "Chamitha",
+    "firstName": "Chamitha",
+    "lastName": "Ekenayake",
+    "tags": [],
+    "taxRegistrationNumber": "789065",
+    "primaryContact": {
+      "name": "exampleCus",
+      "email": "examplecus@gmail.com",
+      "phone": "0784519982",
+      "mobile": ""
+    },
+    "contacts": [],
+    "billingAddress": {
+      "label": "",
+      "line1": "",
+      "line2": "",
+      "city": "",
+      "state": "",
+      "country": "Sri Lanka",
+      "postalCode": "",
+      "phone": "",
+      "deliveryInstructions": "",
+      "isDefault": true,
+      "_id": "6a142a8c44851db073c7d497"
+    },
+    "shippingAddresses": [],
+    "assignedSalesRep": "69f303b0f96a5de7756d11fc",
+    "paymentTerms": {
+      "type": "cod",
+      "creditDays": 0,
+      "creditLimit": 0
+    },
+    "defaultDiscountPercent": 0,
+    "creditStatus": {
+      "currentBalance": 0,
+      "overdueAmount": 0,
+      "availableCredit": 0,
+      "isOverdue": false,
+      "daysPastDue": 0,
+      "onCreditHold": false
+    },
+    "analytics": {
+      "totalOrders": 0,
+      "totalOrderValue": 0,
+      "totalPaidAmount": 0
+    },
+    "status": "on_hold",
+    "createdBy": "69f0d3e6139ae4bf8024a000",
+    "deletedAt": null,
+    "createdAt": "2026-05-25T10:55:08.017Z",
+    "updatedAt": "2026-05-25T10:55:08.017Z",
+    "customerCode": "CUST-3",
+    "__v": 0,
+    "groupName": "—",
+    "phone": "0784519982"
+  },
+  {
+    "_id": "6a1568163a15405f283e2956",
+    "customerType": "individual",
+    "businessType": "retailer",
+    "displayName": "sakuntha",
+    "firstName": "Sakuntha",
+    "lastName": "Kalhara",
+    "tags": [],
+    "businessRegistrationNumber": "67538726",
+    "taxRegistrationNumber": "88921794",
+    "industry": "Marketing",
+    "primaryContact": {
+      "name": "Sakuntha",
+      "email": "sakunthakalhara32@gmail.com",
+      "phone": "0816753277",
+      "mobile": "0763465438"
+    },
+    "contacts": [],
+    "billingAddress": {
+      "label": "",
+      "line1": "",
+      "line2": "",
+      "city": "",
+      "state": "",
+      "country": "Sri Lanka",
+      "postalCode": "",
+      "phone": "",
+      "deliveryInstructions": "",
+      "isDefault": true,
+      "_id": "6a1568163a15405f283e2957"
+    },
+    "shippingAddresses": [],
+    "paymentTerms": {
+      "type": "cod",
+      "creditDays": 0,
+      "creditLimit": 0
+    },
+    "defaultDiscountPercent": 0,
+    "creditStatus": {
+      "currentBalance": 0,
+      "overdueAmount": 0,
+      "availableCredit": 0,
+      "isOverdue": false,
+      "daysPastDue": 0,
+      "onCreditHold": false
+    },
+    "analytics": {
+      "totalOrders": 0,
+      "totalOrderValue": 0,
+      "totalPaidAmount": 0
+    },
+    "status": "active",
+    "createdBy": "69f0d3e6139ae4bf8024a000",
+    "deletedAt": null,
+    "createdAt": "2026-05-26T09:29:58.262Z",
+    "updatedAt": "2026-05-26T09:29:58.262Z",
+    "customerCode": "CUST-6",
+    "__v": 0,
+    "groupName": "—",
+    "phone": "0816753277"
+  }
+]
