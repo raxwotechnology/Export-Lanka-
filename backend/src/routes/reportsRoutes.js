@@ -1,12 +1,12 @@
 import express from 'express';
 import {
-    getDashboardKpis, getRevenueChart, getTopProducts, getTopCustomers,
+    getDashboardKpis, getRevenueChart, getTopProducts, getTopCustomers, getDepartmentDashboardMetrics,
 } from '../controllers/dashboardController.js';
 import {
     getSalesSummary, getSalesByProduct, getSalesByCustomer, getSalesTrend,
 } from '../controllers/reports/salesReportsController.js';
 import {
-    getStockValuation, getStockMovement, getSlowFastMovers, getLowStockReport,
+    getStockValuation, getStockMovement, getSlowFastMovers, getLowStockReport, getDailyStockStatus,
 } from '../controllers/reports/inventoryReportsController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
@@ -30,6 +30,7 @@ import {
 import {
     getHeadcountReport, getAttendanceReport, getLeavePatternsReport, getPayrollSummaryReport,
 } from '../controllers/reports/hrReportsController.js';
+import { getPredictionsDashboard } from '../controllers/reports/predictionsController.js';
 
 const router = express.Router();
 router.use(protect);
@@ -66,18 +67,21 @@ router.get('/dashboard/kpis', requirePermission('dashboard.view'), getDashboardK
 router.get('/dashboard/revenue-chart', requirePermission('dashboard.view'), getRevenueChart);
 router.get('/dashboard/top-products', requirePermission('dashboard.view'), getTopProducts);
 router.get('/dashboard/top-customers', requirePermission('dashboard.view'), getTopCustomers);
+router.get('/dashboard/department-metrics', requirePermission('dashboard.view'), getDepartmentDashboardMetrics);
 
 // Sales reports
 router.get('/sales/summary', requirePermission('reports.sales'), getSalesSummary);
 router.get('/sales/by-product', requirePermission('reports.sales'), getSalesByProduct);
 router.get('/sales/by-customer', requirePermission('reports.sales'), getSalesByCustomer);
 router.get('/sales/trend', requirePermission('reports.sales'), getSalesTrend);
+router.get('/predictions/dashboard', requirePermission('reports.sales'), getPredictionsDashboard);
 
 // Inventory reports
 router.get('/inventory/valuation', requirePermission('reports.inventory'), getStockValuation);
 router.get('/inventory/movement', requirePermission('reports.inventory'), getStockMovement);
 router.get('/inventory/slow-fast-movers', requirePermission('reports.inventory'), getSlowFastMovers);
 router.get('/inventory/low-stock', requirePermission('reports.inventory'), getLowStockReport);
+router.get('/inventory/daily-status', requirePermission('reports.inventory'), getDailyStockStatus);
 
 // ── ALE: COGS & Production Efficiency Reports ──────────────────────────────────
 import ProductionBatch from '../models/ProductionBatch.js';

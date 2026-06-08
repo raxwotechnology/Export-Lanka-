@@ -11,6 +11,37 @@ export default function QaApprovalModal({ isOpen, onClose, grn }) {
     const approveMutation = useApproveGrnQA();
     const [items, setItems] = useState([]);
     const [paidAmountLKR, setPaidAmountLKR] = useState('0');
+    const [sendSms, setSendSms] = useState(true);
+    const [smsMessage, setSmsMessage] = useState('');
+    const [isCustomized, setIsCustomized] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setSendSms(true);
+            setSmsMessage('');
+            setIsCustomized(false);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && grn && !isCustomized) {
+            const supplierName = grn.supplierName || 'Supplier';
+            const formattedDate = grn.receiptDate ? new Date(grn.receiptDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+            
+            // Generate product list from current items state
+            const productsList = items.map(item => {
+                const qty = Number(item.acceptedQuantity) || 0;
+                const uom = item.unitOfMeasure || 'kg';
+                return `${item.productName} (${qty} ${uom})`;
+            }).join(', ');
+
+            const totalPayable = items.reduce((sum, item) => sum + (Number(item.acceptedQuantity || 0) * (item.unitPrice || 0)), 0);
+            const formattedTotal = totalPayable.toLocaleString('en-LK', { minimumFractionDigits: 2 });
+
+            const message = `Dear ${supplierName}, your delivery on ${formattedDate} for ${productsList} has been accepted and QA approved. Total accepted value: Rs. ${formattedTotal}. Thank you.`;
+            setSmsMessage(message);
+        }
+    }, [isOpen, grn, items, isCustomized]);
 
     useEffect(() => {
         if (isOpen && grn) {
@@ -58,7 +89,9 @@ export default function QaApprovalModal({ isOpen, onClose, grn }) {
                     rejectedQuantity: Number(i.rejectedQuantity || 0),
                     batchNumber: i.batchNumber || undefined,
                     rejectionReason: i.rejectionReason || undefined
-                }))
+                })),
+                sendSms: sendSms,
+                customMessage: sendSms ? smsMessage : undefined
             };
             await approveMutation.mutateAsync({ id: grn._id, data: payload });
             toast.success('Supplies QA Approved successfully. Stock and Ledger updated.');
@@ -149,6 +182,39 @@ export default function QaApprovalModal({ isOpen, onClose, grn }) {
                         value={paidAmountLKR}
                         onChange={(e) => setPaidAmountLKR(e.target.value)}
                     />
+                </div>
+
+                <div className="border-t pt-4 space-y-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+                            checked={sendSms}
+                            onChange={(e) => setSendSms(e.target.checked)}
+                        />
+                        <span className="text-sm font-bold text-gray-700">Send confirmation SMS to supplier</span>
+                    </label>
+
+                    {sendSms && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold text-gray-500 block mb-1">SMS Message Content (Editable)</label>
+                            <textarea
+                                className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-500"
+                                rows={3}
+                                value={smsMessage}
+                                onChange={(e) => {
+                                    setSmsMessage(e.target.value);
+                                    setIsCustomized(true);
+                                }}
+                                placeholder="Type custom SMS message here..."
+                                maxLength={1000}
+                            />
+                            <div className="flex justify-between text-[10px] text-gray-400">
+                                <span>{isCustomized ? '⚠️ Custom message' : '✨ Generated template'}</span>
+                                <span>{smsMessage.length} characters</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

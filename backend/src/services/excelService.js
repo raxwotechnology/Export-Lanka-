@@ -364,7 +364,9 @@ class ExcelService {
 
     _formatDate(v) {
         if (!v) return '';
-        return new Date(v).toISOString().split('T')[0];
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return '';
+        return d.toISOString().split('T')[0];
     }
 }
 

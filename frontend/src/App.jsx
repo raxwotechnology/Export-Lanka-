@@ -14,6 +14,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import ComingSoonPage from './pages/ComingSoonPage';
 import AuditLogPage from './pages/AuditLogPage';
+import SmsLogsPage from './pages/SmsLogsPage';
 import WarehousesPage from './pages/WarehousesPage';
 import StockPage from './pages/StockPage';
 import OpeningStockPage from './pages/OpeningStockPage';
@@ -48,6 +49,7 @@ import InquiriesPage from './pages/InquiriesPage';
 import QuotationsPage from './pages/QuotationsPage';
 import ShipmentsPage from './pages/ShipmentsPage';
 import PettyCashPage from './pages/PettyCashPage';
+import FixedAssetsPage from './pages/FixedAssetsPage';
 import FleetPage from './pages/FleetPage';
 import GatePassPage from './pages/GatePassPage';
 import GateScreenPage from './pages/GateScreenPage';
@@ -100,6 +102,8 @@ import FinancialSnapshotPage from './pages/reports/FinancialSnapshotPage';
 import HrReportsPage from './pages/reports/HrReportsPage';
 import VarianceComparisonPage from './pages/reports/VarianceComparisonPage';
 import ShiftReportingPage from './pages/reports/ShiftReportingPage';
+import DailyStockStatusReportPage from './pages/reports/DailyStockStatusReportPage';
+import FuturePredictionsPage from './pages/reports/FuturePredictionsPage';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
@@ -166,6 +170,7 @@ function App() {
         <Route path="/logistics/gate-passes" element={<ProtectedRoute requiredPermission="inventory.view"><GatePassPage /></ProtectedRoute>} />
 
         <Route path="/finance/petty-cash" element={<ProtectedRoute requiredPermission="payments.view"><PettyCashPage /></ProtectedRoute>} />
+        <Route path="/finance/fixed-assets" element={<ProtectedRoute requiredPermission="payments.view"><FixedAssetsPage /></ProtectedRoute>} />
         <Route path="/fleet/vehicles" element={<ProtectedRoute requiredPermission="inventory.view"><FleetPage /></ProtectedRoute>} />
         <Route path="/maintenance/requests" element={<ProtectedRoute requiredPermission="admin.settings"><MaintenancePage /></ProtectedRoute>} />
 
@@ -208,6 +213,7 @@ function App() {
         <Route path="/reports/slow-fast-movers" element={<ProtectedRoute requiredPermission="reports.inventory"><SlowFastMoversReportPage /></ProtectedRoute>} />
         <Route path="/reports/inventory/low-stock" element={<ProtectedRoute requiredPermission="reports.inventory"><LowStockReportPage /></ProtectedRoute>} />
         <Route path="/reports/stock-movement" element={<ProtectedRoute requiredPermission="reports.inventory"><StockMovementReportPage /></ProtectedRoute>} />
+        <Route path="/reports/daily-stock-status" element={<ProtectedRoute requiredPermission="reports.inventory"><DailyStockStatusReportPage /></ProtectedRoute>} />
         <Route path="/reports/production" element={<ProtectedRoute requiredPermission="reports.production"><ProductionReportPage /></ProtectedRoute>} />
         <Route path="/reports/yield-forecaster" element={<ProtectedRoute requiredPermission="reports.production"><YieldForecasterPage /></ProtectedRoute>} />
         <Route path="/reports/returns-damages" element={<ProtectedRoute requiredPermission="reports.sales"><ReturnsReportPage /></ProtectedRoute>} />
@@ -216,6 +222,7 @@ function App() {
         <Route path="/reports/variance-comparator" element={<ProtectedRoute requiredPermission="reports.financial"><VarianceComparisonPage /></ProtectedRoute>} />
         <Route path="/reports/hr" element={<ProtectedRoute requiredPermission="reports.hr"><HrReportsPage /></ProtectedRoute>} />
         <Route path="/reports/shift-wise" element={<ProtectedRoute requiredPermission="reports.hr"><ShiftReportingPage /></ProtectedRoute>} />
+        <Route path="/reports/predictions" element={<ProtectedRoute requiredPermission="reports.sales"><FuturePredictionsPage /></ProtectedRoute>} />
 
         {/* Admin only */}
         <Route path="/users" element={<ProtectedRoute requiredPermission="admin.users.view"><UsersPage /></ProtectedRoute>} />
@@ -223,6 +230,7 @@ function App() {
         <Route path="/import" element={<ProtectedRoute requiredPermission="admin.settings"><ImportDataPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute requiredPermission="admin.settings"><SettingsPage /></ProtectedRoute>} />
         <Route path="/audit-logs" element={<ProtectedRoute requiredPermission="view_audit_logs"><AuditLogPage /></ProtectedRoute>} />
+        <Route path="/audit-logs/sms" element={<ProtectedRoute requiredPermission="view_audit_logs"><SmsLogsPage /></ProtectedRoute>} />
 
         <Route path="/profile" element={<ProfilePage />} />
       </Route>

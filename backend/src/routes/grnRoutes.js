@@ -1,5 +1,5 @@
 import express from 'express';
-import { createGrn, getGrns, getGrnById, approveGrnQA } from '../controllers/grnController.js';
+import { createGrn, getGrns, getGrnById, approveGrnQA, sendGrnSmsManually } from '../controllers/grnController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
 import { validate } from '../middleware/validateMiddleware.js';
@@ -14,5 +14,7 @@ router.route('/')
 
 router.route('/:id').get(requirePermission('grn.manage'), getGrnById);
 router.route('/:id/approve').post(requirePermission('grn.manage'), approveGrnQA);
+router.route('/:id/approve-qa').put(requirePermission('grn.manage'), approveGrnQA);
+router.route('/:id/send-sms').post(requirePermission('grn.manage'), sendGrnSmsManually);
 
 export default router;

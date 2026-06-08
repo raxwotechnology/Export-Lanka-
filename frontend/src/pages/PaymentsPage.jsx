@@ -44,7 +44,7 @@ export default function PaymentsPage() {
                 </div>
             ),
         },
-        { key: 'method', label: 'Method', render: (r) => <span className="capitalize">{r.method.replace('_', ' ')}</span> },
+        { key: 'method', label: 'Method', render: (r) => <span className="capitalize">{(r.method || '').replace('_', ' ')}</span> },
         {
             key: 'amount', label: 'Amount',
             render: (r) => <span className={`font-medium ${r.direction === 'received' ? 'text-green-600' : 'text-red-600'}`}>

@@ -10,6 +10,7 @@ import Badge from '../components/ui/Badge';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import GrnModal from '../features/purchaseOrders/GrnModal';
 import QaApprovalModal from '../features/purchaseOrders/QaApprovalModal';
+import SendGrnSmsModal from '../features/purchaseOrders/SendGrnSmsModal';
 import { usePurchaseOrder, useChangePoStatus, useApproveGrnQA } from '../features/purchaseOrders/usePurchaseOrders';
 import { useAuthStore } from '../store/authStore';
 
@@ -27,6 +28,7 @@ export default function PurchaseOrderDetailPage() {
     const [reason, setReason] = useState('');
     const [isGrnOpen, setIsGrnOpen] = useState(false);
     const [selectedGrnToApprove, setSelectedGrnToApprove] = useState(null);
+    const [selectedGrnToSendSms, setSelectedGrnToSendSms] = useState(null);
 
     const { data, isLoading } = usePurchaseOrder(id);
     const changeStatus = useChangePoStatus();
@@ -218,7 +220,14 @@ export default function PurchaseOrderDetailPage() {
                                                  )}
                                              </div>
                                         ) : (
-                                            <Badge variant="success">Approved</Badge>
+                                            <div className="flex items-center gap-2">
+                                                 <Badge variant="success">Approved</Badge>
+                                                 {canApprove && (
+                                                     <Button size="xs" variant="outline" onClick={() => setSelectedGrnToSendSms(g)}>
+                                                         Send SMS
+                                                     </Button>
+                                                 )}
+                                             </div>
                                         )}
                                     </div>
                                 ))}
@@ -258,6 +267,8 @@ export default function PurchaseOrderDetailPage() {
             <GrnModal isOpen={isGrnOpen} onClose={() => setIsGrnOpen(false)} purchaseOrder={po} />
 
             <QaApprovalModal isOpen={!!selectedGrnToApprove} onClose={() => setSelectedGrnToApprove(null)} grn={selectedGrnToApprove} />
+
+            <SendGrnSmsModal isOpen={!!selectedGrnToSendSms} onClose={() => setSelectedGrnToSendSms(null)} grn={selectedGrnToSendSms} />
 
             <ConfirmDialog
                 isOpen={!!action}

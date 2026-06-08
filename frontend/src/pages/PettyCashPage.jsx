@@ -8,16 +8,16 @@ import {
 import toast from 'react-hot-toast';
 
 const CATEGORIES = [
-    { key: 'rawMaterials', label: 'Raw Materials', color: 'bg-green-500' },
+    { key: 'rawMaterials', label: 'Row materials', color: 'bg-green-500' },
     { key: 'chemicals',    label: 'Chemicals',     color: 'bg-blue-500' },
     { key: 'transport',    label: 'Transport',     color: 'bg-indigo-500' },
     { key: 'welfare',      label: 'Welfare',       color: 'bg-pink-500' },
     { key: 'fuel',         label: 'Fuel',          color: 'bg-orange-500' },
     { key: 'maintenance',  label: 'Maintenance',   color: 'bg-yellow-500' },
     { key: 'stationery',   label: 'Stationery',    color: 'bg-gray-400' },
-    { key: 'miscWages',    label: 'Misc Wages',    color: 'bg-purple-500' },
+    { key: 'miscWages',    label: 'Misc wages',    color: 'bg-purple-500' },
     { key: 'wood',         label: 'Wood',          color: 'bg-amber-600' },
-    { key: 'packing',      label: 'Packing',       color: 'bg-teal-500' },
+    { key: 'packing',      label: 'Packing material', color: 'bg-teal-500' },
 ];
 
 const fmtRs = (n) => `Rs. ${(n || 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
@@ -26,6 +26,7 @@ const emptyExpense = () => ({
     date: new Date().toISOString().split('T')[0],
     refNo: '', item: '', supplier: '', amount: '',
     transactionType: 'expense',
+    category: '',
     rawMaterial_cost: '', chemicals: '', transport: '', welfare: '',
     fuel: '', maintenance: '', stationary: '', miscWages: '', wood: '', packingMaterials: '',
 });
@@ -106,7 +107,7 @@ export default function PettyCashPage() {
             </div>
 
             {/* Balance Dashboard */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Running Balance */}
                 <div className="col-span-1 bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                     <Wallet className="absolute right-[-12px] bottom-[-12px] w-32 h-32 text-white/10" />
@@ -125,7 +126,7 @@ export default function PettyCashPage() {
                 </div>
 
                 {/* Category Breakdown */}
-                <div className="col-span-2 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                <div className="col-span-1 md:col-span-2 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Expense Breakdown by Category</p>
                     <div className="space-y-2">
                         {CATEGORIES.filter(c => (balanceData?.categories?.[c.key] || 0) > 0).slice(0, 6).map(cat => {
@@ -243,7 +244,7 @@ export default function PettyCashPage() {
                             </button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs font-bold text-gray-600 block mb-1">Date</label>
                                     <input type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))}
@@ -254,7 +255,7 @@ export default function PettyCashPage() {
                                     <input value={formData.refNo} onChange={e => setFormData(p => ({ ...p, refNo: e.target.value }))}
                                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
                                 </div>
-                                <div className="col-span-2">
+                                <div className="col-span-1 sm:col-span-2">
                                     <label className="text-xs font-bold text-gray-600 block mb-1">Description *</label>
                                     <input value={formData.item} onChange={e => setFormData(p => ({ ...p, item: e.target.value }))}
                                         required className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
@@ -266,30 +267,88 @@ export default function PettyCashPage() {
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-gray-600 block mb-1">Total Amount (Rs.) *</label>
-                                    <input type="number" value={formData.amount} onChange={e => setFormData(p => ({ ...p, amount: e.target.value }))}
+                                    <input type="number" value={formData.amount} onChange={e => {
+                                        const amt = e.target.value;
+                                        setFormData(p => {
+                                            const updated = { ...p, amount: amt };
+                                            const catVal = p.category;
+                                            if (catVal) {
+                                                updated.rawMaterial_cost = '';
+                                                updated.chemicals = '';
+                                                updated.transport = '';
+                                                updated.welfare = '';
+                                                updated.fuel = '';
+                                                updated.maintenance = '';
+                                                updated.stationary = '';
+                                                updated.miscWages = '';
+                                                updated.wood = '';
+                                                updated.packingMaterials = '';
+
+                                                if (catVal === 'Row materials') {
+                                                    updated.rawMaterial_cost = amt;
+                                                    updated.rawMaterial_rate = amt;
+                                                    updated.rawMaterial_nos = 1;
+                                                } else if (catVal === 'Chemicals') updated.chemicals = amt;
+                                                else if (catVal === 'Transport') updated.transport = amt;
+                                                else if (catVal === 'Welfare') updated.welfare = amt;
+                                                else if (catVal === 'Fuel') updated.fuel = amt;
+                                                else if (catVal === 'Maintenance') updated.maintenance = amt;
+                                                else if (catVal === 'Stationery') updated.stationary = amt;
+                                                else if (catVal === 'Misc wages') updated.miscWages = amt;
+                                                else if (catVal === 'Wood') updated.wood = amt;
+                                                else if (catVal === 'Packing material') updated.packingMaterials = amt;
+                                            }
+                                            return updated;
+                                        });
+                                    }}
                                         required className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
                                 </div>
                             </div>
 
                             {formType !== 'replenish' && (
-                                <>
-                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Category Amounts (Rs.)</p>
-                                    <div className="grid grid-cols-2 gap-3">
+                                <div className="col-span-1 sm:col-span-2">
+                                    <label className="text-xs font-bold text-gray-600 block mb-1">Category *</label>
+                                    <select value={formData.category} onChange={e => {
+                                        const catVal = e.target.value;
+                                        setFormData(p => {
+                                            const updated = {
+                                                ...p,
+                                                category: catVal,
+                                                rawMaterial_cost: '',
+                                                chemicals: '',
+                                                transport: '',
+                                                welfare: '',
+                                                fuel: '',
+                                                maintenance: '',
+                                                stationary: '',
+                                                miscWages: '',
+                                                wood: '',
+                                                packingMaterials: ''
+                                            };
+                                            const amt = p.amount || 0;
+                                            if (catVal === 'Row materials') {
+                                                updated.rawMaterial_cost = amt;
+                                                updated.rawMaterial_rate = amt;
+                                                updated.rawMaterial_nos = 1;
+                                            } else if (catVal === 'Chemicals') updated.chemicals = amt;
+                                            else if (catVal === 'Transport') updated.transport = amt;
+                                            else if (catVal === 'Welfare') updated.welfare = amt;
+                                            else if (catVal === 'Fuel') updated.fuel = amt;
+                                            else if (catVal === 'Maintenance') updated.maintenance = amt;
+                                            else if (catVal === 'Stationery') updated.stationary = amt;
+                                            else if (catVal === 'Misc wages') updated.miscWages = amt;
+                                            else if (catVal === 'Wood') updated.wood = amt;
+                                            else if (catVal === 'Packing material') updated.packingMaterials = amt;
+                                            return updated;
+                                        });
+                                    }}
+                                        required className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+                                        <option value="">Select Category</option>
                                         {CATEGORIES.map(cat => (
-                                            <div key={cat.key}>
-                                                <label className="text-xs text-gray-600 block mb-1">{cat.label}</label>
-                                                <input type="number" placeholder="0"
-                                                    value={formData[cat.key === 'rawMaterials' ? 'rawMaterial_cost' : cat.key === 'stationery' ? 'stationary' : cat.key === 'packing' ? 'packingMaterials' : cat.key] || ''}
-                                                    onChange={e => {
-                                                        const fieldMap = { rawMaterials: 'rawMaterial_cost', stationery: 'stationary', packing: 'packingMaterials' };
-                                                        const field = fieldMap[cat.key] || cat.key;
-                                                        setFormData(p => ({ ...p, [field]: e.target.value }));
-                                                    }}
-                                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
-                                            </div>
+                                            <option key={cat.key} value={cat.label}>{cat.label}</option>
                                         ))}
-                                    </div>
-                                </>
+                                    </select>
+                                </div>
                             )}
 
                             <div className="flex justify-end gap-3 pt-2">

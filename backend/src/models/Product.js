@@ -10,6 +10,12 @@ const productSchema = new mongoose.Schema(
             trim: true,
             uppercase: true,
         },
+        productShortCode: {
+            type: String,
+            trim: true,
+            uppercase: true,
+            maxlength: 3,
+        },
         sku: {
             type: String,
             trim: true,
@@ -163,7 +169,21 @@ productSchema.index({ status: 1 });
 productSchema.pre('save', async function () {
     if (this.isNew && !this.productCode) {
         const seq = await getNextSequence('product');
-        this.productCode = `PRD-${seq}`;
+        const Category = mongoose.model('Category');
+        const cat = await Category.findById(this.categoryId);
+        const codeBase = cat ? (cat.code || cat.name) : 'GEN';
+        const shortCode = codeBase.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase();
+        const pShort = this.productShortCode ? this.productShortCode.toUpperCase() : 'PRD';
+        
+        const today = new Date();
+        const utcToday = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+        const utcJan1 = Date.UTC(today.getFullYear(), 0, 1);
+        const dayOfYear = Math.floor((utcToday - utcJan1) / (24 * 60 * 60 * 1000)) + 1;
+        const julianDay = dayOfYear.toString().padStart(3, '0');
+        const yearShort = today.getFullYear().toString().slice(-2);
+        const sequenceNo = seq.toString().padStart(2, '0');
+        
+        this.productCode = `P-${shortCode}-${pShort}-${yearShort}${julianDay}-${sequenceNo}`;
     }
 });
 

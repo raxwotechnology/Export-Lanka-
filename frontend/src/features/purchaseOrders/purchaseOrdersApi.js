@@ -15,4 +15,5 @@ export const grnsApi = {
     getById: async (id) => (await api.get(`/grns/${id}`)).data,
     create: async (data) => (await api.post('/grns', data)).data,
     approveQA: async (id, data) => (await api.put(`/grns/${id}/approve-qa`, data)).data,
+    sendGrnSms: async (id, data) => (await api.post(`/grns/${id}/send-sms`, data)).data,
 };

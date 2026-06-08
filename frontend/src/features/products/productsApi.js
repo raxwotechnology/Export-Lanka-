@@ -22,8 +22,8 @@ export const productsApi = {
         const response = await api.delete(`/products/${id}`);
         return response.data;
     },
-    getNextCode: async (categoryId) => {
-        const response = await api.get('/products/next-code', { params: { categoryId } });
+    getNextCode: async (categoryId, productShortCode) => {
+        const response = await api.get('/products/next-code', { params: { categoryId, productShortCode } });
         return response.data;
     },
 

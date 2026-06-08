@@ -6,6 +6,7 @@ import Supplier from '../models/Supplier.js';
 import { increaseStock } from '../services/stockService.js';
 import { generateJulianBatchCode } from '../utils/julianDate.js';
 import { getIO } from '../services/socketService.js';
+import { sendGrnConfirmationSms, sendGrnCreationSms } from '../services/smsService.js';
 
 /**
  * Create a GRN — saves in 'pending_approval' queue state and does NOT update active stock immediately.
@@ -68,6 +69,9 @@ export const createGrn = asyncHandler(async (req, res) => {
         .populate('supplierId', 'displayName supplierCode')
         .populate('warehouseId', 'name warehouseCode')
         .populate('items.productId', 'name productCode');
+
+    // Trigger automated supplier confirmation SMS on creation
+    sendGrnCreationSms(populated).catch(console.error);
 
     res.status(201).json({ success: true, message: 'Material receipt entered in Pending Approval queue', data: populated });
 });
@@ -208,6 +212,12 @@ export const approveGrnQA = asyncHandler(async (req, res) => {
             .populate('warehouseId', 'name warehouseCode')
             .populate('items.productId', 'name productCode');
 
+        // Trigger automated supplier confirmation SMS if requested
+        const sendSms = req.body.sendSms !== false;
+        if (sendSms) {
+            sendGrnConfirmationSms(populated, req.body.customMessage).catch(console.error);
+        }
+
         res.json({ success: true, message: 'QA Approved successfully, stock and payable accounts updated.', data: populated });
     } catch (err) {
         res.status(400);
@@ -262,4 +272,36 @@ export const getGrnById = asyncHandler(async (req, res) => {
         .populate('createdBy', 'firstName lastName');
     if (!grn) { res.status(404); throw new Error('GRN not found'); }
     res.json({ success: true, data: grn });
+});
+
+/**
+ * @desc    Manually dispatch/resend confirmation SMS for an approved GRN
+ * @route   POST /api/grns/:id/send-sms
+ * @access  Private/Admin
+ */
+export const sendGrnSmsManually = asyncHandler(async (req, res) => {
+    const { customMessage } = req.body;
+    const grn = await GoodsReceiptNote.findById(req.params.id)
+        .populate('purchaseOrderId', 'poNumber')
+        .populate('supplierId', 'displayName supplierCode')
+        .populate('warehouseId', 'name warehouseCode')
+        .populate('items.productId', 'name productCode');
+
+    if (!grn) {
+        res.status(404);
+        throw new Error('GRN not found');
+    }
+
+    if (grn.status !== 'approved') {
+        res.status(400);
+        throw new Error('Can only send SMS for approved Goods Receipt Notes');
+    }
+
+    const log = await sendGrnConfirmationSms(grn, customMessage);
+
+    res.json({
+        success: true,
+        message: 'SMS dispatch initiated successfully',
+        data: log
+    });
 });

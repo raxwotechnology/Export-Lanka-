@@ -1,5 +1,6 @@
 import asyncHandler from 'express-async-handler';
 import PettyCash from '../models/PettyCash.js';
+import DailyPnL from '../models/DailyPnL.js';
 import { createAuditLog } from '../utils/auditLogger.js';
 import excelService from '../services/excelService.js';
 import { getIO } from '../services/socketService.js';
@@ -34,6 +35,106 @@ const broadcastPettyCashBalance = async () => {
 };
 
 /**
+ * Automatically maps approved petty cash expenses for a specific date to the Daily P&L.
+ */
+export const syncPettyCashToPnL = async (dateInput) => {
+    try {
+        if (!dateInput) return;
+        const dateObj = new Date(dateInput);
+        const startOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+        const endOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), 23, 59, 59, 999);
+
+        // Fetch all approved petty cash expenses for this day
+        const expenses = await PettyCash.find({
+            date: { $gte: startOfDay, $lte: endOfDay },
+            transactionType: 'expense',
+            status: 'approved',
+            deletedAt: null
+        });
+
+        // Sum amounts per category
+        let rawMaterial = 0;
+        let labourSalary = 0;
+        let supervisorQC = 0;
+        let electricity = 0;
+        let firewood = 0;
+        let packing = 0;
+        let transport = 0;
+        let communication = 0;
+        let other = 0;
+
+        for (const exp of expenses) {
+            const cat = exp.category;
+            const amt = exp.amount || 0;
+            if (cat === 'Row materials') {
+                rawMaterial += amt;
+            } else if (cat === 'Chemicals') {
+                other += amt;
+            } else if (cat === 'Transport') {
+                transport += amt;
+            } else if (cat === 'Welfare') {
+                other += amt;
+            } else if (cat === 'Fuel') {
+                transport += amt;
+            } else if (cat === 'Maintenance') {
+                other += amt;
+            } else if (cat === 'Stationery') {
+                communication += amt;
+            } else if (cat === 'Misc wages') {
+                labourSalary += amt;
+            } else if (cat === 'Wood') {
+                firewood += amt;
+            } else if (cat === 'Packing material') {
+                packing += amt;
+            }
+        }
+
+        // Find or create DailyPnL for this day
+        let pnlRecord = await DailyPnL.findOne({
+            date: { $gte: startOfDay, $lte: endOfDay },
+            deletedAt: null
+        });
+
+        if (!pnlRecord) {
+            pnlRecord = new DailyPnL({
+                date: startOfDay,
+                day: startOfDay.getDate(),
+                rawMaterial,
+                labourSalary,
+                supervisorQC: 0,
+                electricity: 0,
+                firewood,
+                packing,
+                transport,
+                communication,
+                other,
+                totalRevenue: 0,
+            });
+        } else {
+            pnlRecord.rawMaterial = rawMaterial;
+            pnlRecord.labourSalary = labourSalary;
+            pnlRecord.firewood = firewood;
+            pnlRecord.packing = packing;
+            pnlRecord.transport = transport;
+            pnlRecord.communication = communication;
+            pnlRecord.other = other;
+        }
+
+        const expenseFields = ['rawMaterial', 'labourSalary', 'supervisorQC', 'electricity', 'firewood', 'packing', 'transport', 'communication', 'other'];
+        pnlRecord.totalExpenses = expenseFields.reduce((acc, field) => acc + (pnlRecord[field] || 0), 0);
+        pnlRecord.netProfit = (pnlRecord.totalRevenue || 0) - pnlRecord.totalExpenses;
+
+        await pnlRecord.save();
+        
+        // Sync to Excel
+        await excelService.updateExcelRow('pnl', pnlRecord.toObject());
+        console.log(`[PettyCash Sync] Synced P&L for date ${startOfDay.toISOString().split('T')[0]}`);
+    } catch (error) {
+        console.error(`[PettyCash Sync] Failed to sync to P&L:`, error.message);
+    }
+};
+
+/**
  * @desc    Submit a petty cash expense or replenishment
  * @route   POST /api/finance/petty-cash
  * @access  Private
@@ -59,6 +160,10 @@ export const createPettyCashEntry = asyncHandler(async (req, res) => {
     // Sync to Excel
     excelService.appendExcelRow('petty_cash', entry.toObject()).catch(console.error);
     broadcastPettyCashBalance();
+
+    if (entry.status === 'approved' && entry.transactionType === 'expense') {
+        syncPettyCashToPnL(entry.date).catch(console.error);
+    }
 });
 
 /**
@@ -96,6 +201,12 @@ export const getPettyCashEntryById = asyncHandler(async (req, res) => {
 
 // Update a petty cash entry
 export const updatePettyCashEntry = asyncHandler(async (req, res) => {
+    const oldEntry = await PettyCash.findOne({ _id: req.params.id, deletedAt: null });
+    if (!oldEntry) {
+        res.status(404);
+        throw new Error('Petty cash entry not found');
+    }
+
     const entry = await PettyCash.findOneAndUpdate({ _id: req.params.id, deletedAt: null }, { ...req.body, runValidators: true }, { new: true });
     if (!entry) {
         res.status(404);
@@ -113,6 +224,13 @@ export const updatePettyCashEntry = asyncHandler(async (req, res) => {
     // Sync to Excel
     excelService.updateExcelRow('petty_cash', entry.toObject()).catch(console.error);
     broadcastPettyCashBalance();
+
+    if (oldEntry.transactionType === 'expense' || entry.transactionType === 'expense') {
+        syncPettyCashToPnL(oldEntry.date).catch(console.error);
+        if (oldEntry.date && entry.date && new Date(oldEntry.date).toISOString().split('T')[0] !== new Date(entry.date).toISOString().split('T')[0]) {
+            syncPettyCashToPnL(entry.date).catch(console.error);
+        }
+    }
 });
 
 // Soft delete a petty cash entry
@@ -136,6 +254,10 @@ export const deletePettyCashEntry = asyncHandler(async (req, res) => {
     // Sync to Excel
     excelService.deleteExcelRow('petty_cash', entry.toObject()).catch(console.error);
     broadcastPettyCashBalance();
+
+    if (entry.transactionType === 'expense' && entry.status === 'approved') {
+        syncPettyCashToPnL(entry.date).catch(console.error);
+    }
 });
 
 /**
@@ -166,6 +288,10 @@ export const updatePettyCashStatus = asyncHandler(async (req, res) => {
 
     res.json({ success: true, data: entry });
     broadcastPettyCashBalance();
+
+    if (entry.transactionType === 'expense') {
+        syncPettyCashToPnL(entry.date).catch(console.error);
+    }
 });
 
 /**

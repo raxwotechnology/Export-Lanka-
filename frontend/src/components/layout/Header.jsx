@@ -42,32 +42,32 @@ export default function Header({ onToggleSidebar }) {
                 >
                     <Menu size={20} />
                 </button>
-                <h1 className="text-lg font-semibold text-gray-900">
+                <h1 className="text-sm sm:text-lg font-semibold text-gray-900 truncate max-w-[120px] sm:max-w-none">
                     Welcome, {user?.firstName}
                 </h1>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
                 <NotificationDropdown />
 
-                <div className="flex items-center gap-3 px-3 py-1.5 bg-gray-50 rounded-lg">
-                    <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                <div className="flex items-center gap-2 px-2 py-1.5 sm:px-3 sm:py-1.5 bg-gray-50 rounded-lg">
+                    <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <button onClick={() => navigate('/profile')}>
                             <UserIcon className="w-4 h-4 text-primary-600" />
                         </button>
                     </div>
-                    <div className="text-sm">
-                        <p className="font-medium text-gray-900">{user?.fullName}</p>
-                        <p className="text-xs text-gray-500">{roleLabel}</p>
+                    <div className="text-sm hidden md:block">
+                        <p className="font-medium text-gray-900 leading-tight">{user?.fullName}</p>
+                        <p className="text-xs text-gray-500 leading-tight">{roleLabel}</p>
                     </div>
                 </div>
 
                 <button
                     onClick={handleLogout}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition"
                 >
                     <LogOut size={16} />
-                    <span>Logout</span>
+                    <span className="hidden sm:inline">Logout</span>
                 </button>
             </div>
         </header>

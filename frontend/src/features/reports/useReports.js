@@ -92,3 +92,8 @@ export const useLowStockReport = () => useQuery({
     queryKey: ['lowStockReport'],
     queryFn: inventoryReportsApi.lowStock,
 });
+
+export const useDailyStockStatus = (params = {}) => useQuery({
+    queryKey: ['dailyStockStatus', params],
+    queryFn: () => inventoryReportsApi.dailyStatus(params),
+});

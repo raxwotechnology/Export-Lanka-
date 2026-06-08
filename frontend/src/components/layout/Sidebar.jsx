@@ -7,7 +7,7 @@ import {
     RotateCcw, Wrench, AlertTriangle, FileMinus, X, Users as UsersIcon, Building2, Clock, Calendar as CalendarIcon, Plane, Calculator, DollarSign, Upload,
     ClipboardList, UserPlus, Ship, Layers, History, FileSpreadsheet,
     ChevronDown, ChevronRight, CheckSquare, ClipboardCheck, BadgeCheck,
-    PackageCheck, CreditCard, Tag,
+    PackageCheck, CreditCard, Tag, Mail, Sparkles,
 } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
 
@@ -75,6 +75,7 @@ const menuGroups = [
             { label: 'Cheque Ledger', icon: FileSpreadsheet, path: '/finance/cheques', permission: 'payments.view' },
             { label: 'Bank Accounts', icon: Building2, path: '/finance/bank-accounts', permission: 'payments.view' },
             { label: 'Petty Cash', icon: DollarSign, path: '/finance/petty-cash', permission: 'payments.view' },
+            { label: 'Fixed Assets', icon: Tag, path: '/finance/fixed-assets', permission: 'payments.view' },
             { label: 'Credit Notes', icon: FileMinus, path: '/credit-notes', permission: 'credit_notes.view' },
         ],
     },
@@ -112,6 +113,7 @@ const menuGroups = [
             { label: 'Roles', icon: ShieldCheck, path: '/roles', permission: 'admin.roles.view' },
             { label: 'Data Import', icon: Upload, path: '/import', permission: 'admin.settings' },
             { label: 'Audit Logs', icon: History, path: '/audit-logs', permission: 'view_audit_logs' },
+            { label: 'SMS Dispatch Logs', icon: Mail, path: '/audit-logs/sms', permission: 'view_audit_logs' },
             { label: 'Settings', icon: Settings, path: '/settings', permission: 'admin.settings' },
         ],
     },
@@ -131,9 +133,10 @@ const menuGroups = [
         ],
     },
     {
-        label: 'Reports',
+        label: 'Reports & AI',
         items: [
             { label: 'Reports', icon: BarChart3, path: '/reports', anyPermission: ['reports.sales', 'reports.financial', 'reports.inventory', 'reports.hr', 'reports.production'] },
+            { label: 'Future Predictions', icon: Sparkles, path: '/reports/predictions', anyPermission: ['reports.sales', 'reports.financial', 'reports.inventory', 'reports.production'] },
         ],
     },
 ];

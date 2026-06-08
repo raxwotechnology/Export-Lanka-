@@ -4,6 +4,7 @@ const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ID').or(z.litera
 
 export const productFormSchema = z.object({
     productCode: z.string().optional().or(z.literal('')),
+    productShortCode: z.string().max(3, 'Max 3 characters').optional().or(z.literal('')),
     name: z.string().min(1, 'Product name is required').max(200),
     shortName: z.string().max(100).optional().or(z.literal('')),
     sku: z.string().max(50).optional().or(z.literal('')),

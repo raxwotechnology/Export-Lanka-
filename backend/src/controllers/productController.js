@@ -207,7 +207,7 @@ export const predictYield = asyncHandler(async (req, res) => {
 });
 
 export const getNextProductCode = asyncHandler(async (req, res) => {
-    const { categoryId } = req.query;
+    const { categoryId, productShortCode } = req.query;
 
     if (!categoryId) {
         res.status(400);
@@ -239,8 +239,12 @@ export const getNextProductCode = asyncHandler(async (req, res) => {
     const yearShort = today.getFullYear().toString().slice(-2);
     const julianDay = dayOfYear.toString().padStart(3, '0');
 
-    // Build the atomic lock key format: parts:[CategoryShortCode]:[YY][JulianDay]
-    const counterKey = `parts:${shortCode}:${yearShort}${julianDay}`;
+    const pShort = productShortCode ? String(productShortCode).trim().substring(0, 3).toUpperCase() : '';
+
+    // Build the atomic lock key format: parts:[CategoryShortCode]:[ProductShortCode]:[YY][JulianDay]
+    const counterKey = pShort
+        ? `parts:${shortCode}:${pShort}:${yearShort}${julianDay}`
+        : `parts:${shortCode}:${yearShort}${julianDay}`;
 
     // Atomically increment the sequence counter
     const counter = await PartCounter.findOneAndUpdate(
@@ -250,7 +254,9 @@ export const getNextProductCode = asyncHandler(async (req, res) => {
     );
 
     const sequenceNo = counter.sequence.toString().padStart(2, '0');
-    const productCode = `P-${shortCode}-${yearShort}${julianDay}-${sequenceNo}`;
+    const productCode = pShort
+        ? `P-${shortCode}-${pShort}-${yearShort}${julianDay}-${sequenceNo}`
+        : `P-${shortCode}-${yearShort}${julianDay}-${sequenceNo}`;
 
     res.json({ success: true, productCode });
 });

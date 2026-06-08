@@ -7,7 +7,7 @@ import { useSocket } from '../../hooks/useSocket';
 
 export default function AppLayout() {
     const { user } = useAuthStore();
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
 
     // Initialize real-time notifications
     useSocket();

@@ -245,3 +245,120 @@ export const getLowStockReport = asyncHandler(async (req, res) => {
 
     res.json({ success: true, data });
 });
+
+/**
+ * GET /api/reports/inventory/daily-status
+ * Shows opening stock, received, issued, closing stock, and closing value for each product.
+ */
+export const getDailyStockStatus = asyncHandler(async (req, res) => {
+    const { startDate, endDate, productId, warehouseId } = req.query;
+
+    // Default dates: last 30 days if not provided
+    const end = endDate ? new Date(endDate) : new Date();
+    end.setHours(23, 59, 59, 999);
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    start.setHours(0, 0, 0, 0);
+
+    // 1. Fetch all products
+    const productQuery = { deletedAt: null };
+    if (productId) productQuery._id = productId;
+    const products = await Product.find(productQuery).select('name productCode productType unitOfMeasure basePrice');
+
+    // 2. Fetch current stock items to find current on-hand and cost
+    const stockQuery = {};
+    if (productId) stockQuery.productId = productId;
+    if (warehouseId) stockQuery.warehouseId = warehouseId;
+    const stockItems = await StockItem.find(stockQuery);
+
+    // Group current on-hand and total cost values by productId
+    const currentStockMap = {};
+    stockItems.forEach(item => {
+        const pId = item.productId ? item.productId.toString() : 'unknown';
+        if (!currentStockMap[pId]) {
+            currentStockMap[pId] = { onHand: 0, totalValue: 0, costSum: 0, costCount: 0 };
+        }
+        currentStockMap[pId].onHand += item.quantities?.onHand || 0;
+        currentStockMap[pId].totalValue += (item.quantities?.onHand || 0) * (item.costPerUnit || 0);
+        currentStockMap[pId].costSum += item.costPerUnit || 0;
+        currentStockMap[pId].costCount += 1;
+    });
+
+    // 3. For each product, calculate inventory metrics
+    const reportData = [];
+
+    for (const product of products) {
+        const pId = product._id.toString();
+        const currentData = currentStockMap[pId] || { onHand: 0, totalValue: 0, costSum: 0, costCount: 0 };
+
+        // Average cost per unit is either current total value / current onHand,
+        // or average of costPerUnit, or basePrice as fallback
+        let costPerUnit = 0;
+        if (currentData.onHand > 0) {
+            costPerUnit = currentData.totalValue / currentData.onHand;
+        } else if (currentData.costCount > 0) {
+            costPerUnit = currentData.costSum / currentData.costCount;
+        } else {
+            costPerUnit = product.basePrice || 0;
+        }
+
+        // Fetch movements after endDate (to reverse back to endDate closing stock)
+        const movementsAfterFilter = {
+            productId: product._id,
+            createdAt: { $gt: end }
+        };
+        if (warehouseId) movementsAfterFilter.warehouseId = warehouseId;
+        const movementsAfter = await StockMovement.find(movementsAfterFilter).select('quantity direction');
+
+        let adjustment = 0;
+        movementsAfter.forEach(m => {
+            if (m.direction === 'in') {
+                adjustment -= m.quantity;
+            } else if (m.direction === 'out') {
+                adjustment += m.quantity;
+            }
+        });
+
+        const closingStock = currentData.onHand + adjustment;
+
+        // Fetch movements within range [startDate, endDate]
+        const movementsInFilter = {
+            productId: product._id,
+            createdAt: { $gte: start, $lte: end }
+        };
+        if (warehouseId) movementsInFilter.warehouseId = warehouseId;
+        const movementsInRange = await StockMovement.find(movementsInFilter).select('quantity direction');
+
+        let received = 0;
+        let issued = 0;
+        movementsInRange.forEach(m => {
+            if (m.direction === 'in') {
+                received += m.quantity;
+            } else if (m.direction === 'out') {
+                issued += m.quantity;
+            }
+        });
+
+        const openingStock = closingStock - received + issued;
+        const closingValue = closingStock * costPerUnit;
+
+        reportData.push({
+            productId: product._id,
+            productCode: product.productCode,
+            productName: product.name,
+            productType: product.productType,
+            unitOfMeasure: product.unitOfMeasure,
+            openingStock: parseFloat(openingStock.toFixed(2)),
+            received: parseFloat(received.toFixed(2)),
+            issued: parseFloat(issued.toFixed(2)),
+            closingStock: parseFloat(closingStock.toFixed(2)),
+            costPerUnit: parseFloat(costPerUnit.toFixed(2)),
+            closingValue: parseFloat(closingValue.toFixed(2))
+        });
+    }
+
+    res.json({
+        success: true,
+        period: { start, end },
+        data: reportData
+    });
+});

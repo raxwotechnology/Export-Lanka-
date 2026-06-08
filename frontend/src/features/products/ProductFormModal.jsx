@@ -39,6 +39,7 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
         resolver: zodResolver(productFormSchema),
         defaultValues: {
             productCode: '',
+            productShortCode: '',
             type: 'trading',
             status: 'active',
             taxable: true,
@@ -54,6 +55,7 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
         if (isOpen && product) {
             reset({
                 productCode: product.productCode || '',
+                productShortCode: product.productShortCode || '',
                 name: product.name || '',
                 shortName: product.shortName || '',
                 sku: product.sku || '',
@@ -87,6 +89,7 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
             // Reset to defaults when creating new
             reset({
                 productCode: '',
+                productShortCode: '',
                 type: 'trading',
                 status: 'active',
                 taxable: true,
@@ -100,14 +103,15 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
     }, [isOpen, product, reset]);
 
     const selectedCategoryId = watch('categoryId');
+    const selectedProductShortCode = watch('productShortCode');
     const [isLoadingCode, setIsLoadingCode] = useState(false);
 
     useEffect(() => {
-        if (!isEdit && isOpen && selectedCategoryId) {
+        if (!isEdit && isOpen && selectedCategoryId && selectedProductShortCode && selectedProductShortCode.length === 3) {
             const fetchNextCode = async () => {
                 setIsLoadingCode(true);
                 try {
-                    const response = await productsApi.getNextCode(selectedCategoryId);
+                    const response = await productsApi.getNextCode(selectedCategoryId, selectedProductShortCode);
                     if (response?.success && response?.productCode) {
                         setValue('productCode', response.productCode);
                     }
@@ -118,15 +122,16 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
                 }
             };
             fetchNextCode();
-        } else if (!isEdit && isOpen && !selectedCategoryId) {
+        } else if (!isEdit && isOpen && (!selectedCategoryId || !selectedProductShortCode || selectedProductShortCode.length !== 3)) {
             setValue('productCode', '');
         }
-    }, [selectedCategoryId, isEdit, isOpen, setValue]);
+    }, [selectedCategoryId, selectedProductShortCode, isEdit, isOpen, setValue]);
 
     const onSubmit = async (data) => {
         // Transform flat form data back into nested structure for API
         const payload = {
             productCode: data.productCode || undefined,
+            productShortCode: data.productShortCode || undefined,
             name: data.name,
             shortName: data.shortName || undefined,
             sku: data.sku || undefined,
@@ -223,7 +228,16 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
                 <div className="p-6">
                     {activeTab === 'basic' && (
                         <div className="space-y-4">
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-4 gap-4">
+                                <Input
+                                    label="Short Code (e.g. MOR)"
+                                    maxLength={3}
+                                    placeholder="3 letters"
+                                    disabled={isEdit}
+                                    required
+                                    error={errors.productShortCode?.message}
+                                    {...register('productShortCode')}
+                                />
                                 <Input
                                     label="Product Code"
                                     disabled

@@ -73,3 +73,16 @@ export const useApproveGrnQA = () => {
         onError: (err) => toast.error(err.response?.data?.message || 'Failed to approve GRN'),
     });
 };
+
+export const useSendGrnSms = () => {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }) => grnsApi.sendGrnSms(id, data),
+        onSuccess: (res) => {
+            qc.invalidateQueries({ queryKey: ['purchaseOrder'] });
+            qc.invalidateQueries({ queryKey: ['grns'] });
+            toast.success(res.message || 'SMS sent successfully');
+        },
+        onError: (err) => toast.error(err.response?.data?.message || 'Failed to send SMS'),
+    });
+};

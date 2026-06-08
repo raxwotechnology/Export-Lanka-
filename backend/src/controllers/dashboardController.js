@@ -9,6 +9,13 @@ import PurchaseOrder from '../models/PurchaseOrder.js';
 import Bill from '../models/Bill.js';
 import ProductionOrder from '../models/ProductionOrder.js';
 import CustomerReturn from '../models/CustomerReturn.js';
+import BankAccount from '../models/BankAccount.js';
+import Inquiry from '../models/Inquiry.js';
+import Attendance from '../models/Attendance.js';
+import Payroll from '../models/Payroll.js';
+import GoodsReceiptNote from '../models/GoodsReceiptNote.js';
+import PettyCash from '../models/PettyCash.js';
+import ProductionBatch from '../models/ProductionBatch.js';
 
 /**
  * GET /api/dashboard/kpis
@@ -274,4 +281,177 @@ export const getTopCustomers = asyncHandler(async (req, res) => {
     ]);
 
     res.json({ success: true, data });
+});
+
+/**
+ * GET /api/reports/dashboard/department-metrics
+ * Returns aggregated metrics for General, Operations, Finance, Sales, and HR department tabs
+ */
+export const getDepartmentDashboardMetrics = asyncHandler(async (req, res) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // 1. General Management (MD)
+    const [recentInvoices, recentGrns, recentBatches, recentOrders] = await Promise.all([
+        Invoice.find({ deletedAt: null }).sort({ createdAt: -1 }).limit(5).populate('customerId', 'displayName'),
+        GoodsReceiptNote.find({ deletedAt: null }).sort({ createdAt: -1 }).limit(5),
+        ProductionBatch.find({ deletedAt: null }).sort({ createdAt: -1 }).limit(5),
+        SalesOrder.find({ deletedAt: null }).sort({ createdAt: -1 }).limit(5).populate('customerId', 'displayName')
+    ]);
+
+    // 2. Operations
+    const lowestStock = await StockItem.aggregate([
+        {
+            $lookup: {
+                from: 'products', localField: 'productId', foreignField: '_id', as: 'product'
+            }
+        },
+        { $unwind: '$product' },
+        { $match: { 'product.deletedAt': null } },
+        {
+            $project: {
+                name: '$product.name',
+                productCode: '$product.productCode',
+                productType: '$product.productType',
+                available: { $subtract: ['$quantities.onHand', '$quantities.reserved'] },
+                unit: '$unitOfMeasure'
+            }
+        },
+        { $sort: { available: 1 } },
+        { $limit: 5 }
+    ]);
+
+    const [activeProd, completedProdThisMonth] = await Promise.all([
+        ProductionOrder.countDocuments({ status: 'in_progress', deletedAt: null }),
+        ProductionOrder.countDocuments({ status: 'completed', actualEndDate: { $gte: startOfMonth }, deletedAt: null })
+    ]);
+
+    // 3. Finance
+    const bankAccounts = await BankAccount.find({ deletedAt: null });
+    const bankSummary = bankAccounts.map(b => ({
+        bankName: b.bankName,
+        accountNumber: b.accountNumber,
+        balance: b.balance || 0
+    }));
+    const totalBankBalance = bankAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+
+    const [pettySummary] = await PettyCash.aggregate([
+        { $match: { deletedAt: null, poolId: 'MAIN' } },
+        {
+            $group: {
+                _id: null,
+                totalReceipts: {
+                    $sum: { $cond: [{ $eq: ['$transactionType', 'receipt'] }, '$amount', 0] }
+                },
+                totalExpenses: {
+                    $sum: { $cond: [{ $eq: ['$transactionType', 'expense'] }, '$amount', 0] }
+                }
+            }
+        }
+    ]);
+    const pettyCashBalance = pettySummary ? (pettySummary.totalReceipts - pettySummary.totalExpenses) : 0;
+
+    const [arTotal, apTotal] = await Promise.all([
+        Invoice.aggregate([
+            { $match: { deletedAt: null, paymentStatus: { $in: ['unpaid', 'partially_paid', 'overdue'] } } },
+            { $group: { _id: null, total: { $sum: '$balanceDue' } } }
+        ]),
+        Bill.aggregate([
+            { $match: { deletedAt: null, paymentStatus: { $in: ['unpaid', 'partially_paid', 'overdue'] } } },
+            { $group: { _id: null, total: { $sum: '$balanceDue' } } }
+        ])
+    ]);
+
+    // 4. Sales
+    const funnelStages = await Inquiry.aggregate([
+        { $match: { deletedAt: null } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+    const pipelineFunnel = funnelStages.map(s => ({
+        stage: s._id,
+        count: s.count
+    }));
+
+    const topProducts = await SalesOrder.aggregate([
+        {
+            $match: {
+                deletedAt: null,
+                orderDate: { $gte: startOfMonth },
+                status: { $nin: ['draft', 'cancelled'] }
+            }
+        },
+        { $unwind: '$items' },
+        {
+            $group: {
+                _id: '$items.productId',
+                productName: { $first: '$items.productName' },
+                quantitySold: { $sum: '$items.orderedQuantity' },
+                revenue: { $sum: { $multiply: ['$items.orderedQuantity', '$items.unitPrice'] } }
+            }
+        },
+        { $sort: { revenue: -1 } },
+        { $limit: 5 }
+    ]);
+
+    // 5. HR
+    const attendanceToday = await Attendance.countDocuments({
+        date: { $gte: today, $lt: tomorrow },
+        deletedAt: null
+    });
+
+    const activePayrolls = await Payroll.find({
+        month: new Date().toISOString().slice(0, 7),
+        deletedAt: null
+    });
+    let totalEpfEmployer = 0;
+    let totalEpfEmployee = 0;
+    let totalEtf = 0;
+    let totalNetSalary = 0;
+
+    activePayrolls.forEach(p => {
+        totalEpfEmployer += p.epfEmployer || 0;
+        totalEpfEmployee += p.epfEmployee || 0;
+        totalEtf += p.etf || 0;
+        totalNetSalary += p.netSalary || 0;
+    });
+
+    res.json({
+        success: true,
+        data: {
+            general: {
+                recentInvoices,
+                recentGrns,
+                recentBatches,
+                recentOrders
+            },
+            operations: {
+                lowestStock,
+                activeProduction: activeProd,
+                completedProductionThisMonth: completedProdThisMonth
+            },
+            finance: {
+                bankSummary,
+                totalBankBalance,
+                pettyCashBalance,
+                receivables: arTotal[0]?.total || 0,
+                payables: apTotal[0]?.total || 0
+            },
+            sales: {
+                pipelineFunnel,
+                topProducts
+            },
+            hr: {
+                attendanceToday,
+                payrollStats: {
+                    epfEmployer: totalEpfEmployer,
+                    epfEmployee: totalEpfEmployee,
+                    etf: totalEtf,
+                    netSalary: totalNetSalary,
+                    totalPayrolls: activePayrolls.length
+                }
+            }
+        }
+    });
 });

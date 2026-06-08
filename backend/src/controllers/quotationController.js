@@ -47,7 +47,7 @@ export const getQuotations = asyncHandler(async (req, res) => {
     const [quotations, total] = await Promise.all([
         Quotation.find(filter)
             .populate('customerId', 'displayName companyName')
-            .populate('items.productId', 'name productCode')
+            .populate('items.product', 'name productCode')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(Number(limit)),
@@ -71,7 +71,7 @@ export const getQuotations = asyncHandler(async (req, res) => {
 export const getQuotationById = asyncHandler(async (req, res) => {
     const quotation = await Quotation.findById(req.params.id)
         .populate('customerId', 'displayName companyName primaryContact billingAddress')
-        .populate('items.productId', 'name productCode uom basePrice sku')
+        .populate('items.product', 'name productCode uom basePrice sku')
         .populate('createdBy', 'firstName lastName');
 
     if (!quotation) {
