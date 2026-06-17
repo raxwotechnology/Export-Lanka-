@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'react-hot-toast';
+import { getBackendUrl } from '../api/config';
 
 let socket = null;
 let useCount = 0;
@@ -15,8 +16,7 @@ export const useSocket = () => {
         useCount++;
 
         if (!socket) {
-            // Strip /api from VITE_API_URL to get the base socket server URL
-            const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5001/api').replace('/api', '');
+            const baseUrl = getBackendUrl();
 
             socket = io(baseUrl, {
                 auth: { userId: user._id },

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import io from 'socket.io-client';
+import { getBackendUrl } from '../api/config';
 
 const STATUS_STYLES = {
     pending:  'bg-amber-50 text-amber-700 border border-amber-200',
@@ -43,7 +44,7 @@ export default function GatePassPage() {
     useEffect(() => {
         fetchPasses();
         // Socket.IO real-time updates
-        const socket = io(import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000', {
+        const socket = io(getBackendUrl(), {
             withCredentials: true,
         });
         socket.on('gate_pass_approved', () => { fetchPasses(); toast.success('✅ Gate pass approved!'); });

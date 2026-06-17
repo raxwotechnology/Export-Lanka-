@@ -3,6 +3,7 @@ import api from '../api/axios';
 import { format } from 'date-fns';
 import { Truck, Package, Shield, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import io from 'socket.io-client';
+import { getBackendUrl } from '../api/config';
 
 export default function GateScreenPage() {
     const [gp, setGp]           = useState(null);
@@ -29,7 +30,7 @@ export default function GateScreenPage() {
         const poll = setInterval(fetchScreen, 30000);
 
         // Socket.IO primary channel
-        const socket = io(import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000', { withCredentials: true });
+        const socket = io(getBackendUrl(), { withCredentials: true });
         socket.on('connect', () => setConnected(true));
         socket.on('disconnect', () => setConnected(false));
         socket.on('gate_pass_approved', (data) => {

@@ -4,6 +4,7 @@ import { Eye, Receipt, TrendingUp, TrendingDown, Clock, Search } from 'lucide-re
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import io from 'socket.io-client';
+import { getBackendUrl } from '../api/config';
 
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
@@ -30,7 +31,7 @@ export default function ChequeLedgerPage() {
 
     useEffect(() => {
         // Socket.IO real-time updates for bank and cheque clearances
-        const socket = io(import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000', {
+        const socket = io(getBackendUrl(), {
             withCredentials: true,
         });
         socket.on('cheque_cleared', () => {
