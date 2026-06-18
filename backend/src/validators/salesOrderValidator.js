@@ -35,6 +35,13 @@ export const createSalesOrderSchema = z.object({
     status: z.enum(['draft', 'pending_approval', 'approved']).optional(),
     creditOverride: z.boolean().optional(),
     creditOverrideReason: z.string().optional(),
+    paymentMethod: z.enum(['cash', 'card', 'bank_transfer', 'cheque']).optional(),
+    bankAccountId: objectId.optional(),
+    paymentReference: z.string().optional(),
+    chequeNumber: z.string().optional(),
+    chequeDate: z.string().optional(),
+    bankName: z.string().optional(),
+    chequeStatus: z.enum(['cleared', 'pending', 'cancelled']).optional(),
 });
 
 export const updateSalesOrderSchema = createSalesOrderSchema.partial();

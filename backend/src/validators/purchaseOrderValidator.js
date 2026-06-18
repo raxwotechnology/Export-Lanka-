@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/);
+const optionalObjectId = z.union([
+    z.string().regex(/^[0-9a-fA-F]{24}$/),
+    z.literal('')
+]).transform(val => val === '' ? undefined : val).optional();
 
 const poLineSchema = z.object({
     productId: objectId,
@@ -31,7 +35,7 @@ export const createPurchaseOrderSchema = z.object({
 export const updatePurchaseOrderSchema = createPurchaseOrderSchema.partial();
 
 const grnLineSchema = z.object({
-    poLineItemId: objectId.optional(),
+    poLineItemId: optionalObjectId,
     productId: objectId,
     receivedQuantity: z.coerce.number().min(0),
     acceptedQuantity: z.coerce.number().min(0).optional(),
@@ -46,11 +50,11 @@ const grnLineSchema = z.object({
 });
 
 export const createGrnSchema = z.object({
-    purchaseOrderId: objectId.optional(),
+    purchaseOrderId: optionalObjectId,
     warehouseId: objectId,
     sourceType: z.enum(['supplier', 'own_farm']).optional(),
-    supplierId: objectId.optional(),
-    farmId: objectId.optional(),
+    supplierId: optionalObjectId,
+    farmId: optionalObjectId,
     supplierName: z.string().optional(),
     farmName: z.string().optional(),
     receiptDate: z.string().optional(),

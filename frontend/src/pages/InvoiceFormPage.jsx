@@ -40,9 +40,12 @@ export default function InvoiceFormPage() {
     const customerOptions = (customersData?.data || []).map((c) => ({
         value: c._id, label: `${c.displayName} (${c.customerCode})`,
     }));
-    const productOptions = (productsData?.data || []).map((p) => ({
-        value: p._id, label: `${p.name} — ${p.productCode}`,
-    }));
+    const NON_SELLABLE_TYPES = ['raw_material', 'packaging', 'consumable', 'service'];
+    const productOptions = (productsData?.data || [])
+        .filter((p) => p.canBeSold !== false && !NON_SELLABLE_TYPES.includes(p.productType))
+        .map((p) => ({
+            value: p._id, label: `${p.name} — ${p.productCode}`,
+        }));
 
     const addItem = () => setItems([...items, { productName: '', quantity: 1, unitPrice: 0, taxRate: 18, taxable: true }]);
     const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
@@ -54,7 +57,7 @@ export default function InvoiceFormPage() {
             if (p) {
                 newItems[idx].productName = p.name;
                 newItems[idx].productCode = p.productCode;
-                newItems[idx].unitPrice = p.basePrice;
+                newItems[idx].unitPrice = p.basePrice || p.costs?.lastPurchaseCost || p.costs?.averageCost || 0;
                 newItems[idx].taxRate = p.tax?.taxRate || 0;
                 newItems[idx].taxable = p.tax?.taxable ?? true;
                 newItems[idx].unitOfMeasure = p.unitOfMeasure;

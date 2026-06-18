@@ -51,11 +51,17 @@ export const increaseStock = async ({
     productId, warehouseId, quantity, costPerUnit = 0,
     movementType, batchNumber = null,
     sourceDocument, reason, notes, userId, session,
+    openQuantity, // new parameter
 }) => {
     if (!quantity || quantity <= 0) throw new Error('Quantity must be greater than 0');
 
     const product = await Product.findById(productId).session(session || null);
     if (!product) throw new Error(`Product ${productId} not found`);
+
+    if (product.status !== 'active') {
+        product.status = 'active';
+        await product.save({ session: session || undefined });
+    }
 
     const warehouse = await Warehouse.findById(warehouseId).session(session || null);
     if (!warehouse) throw new Error(`Warehouse ${warehouseId} not found`);
@@ -67,6 +73,13 @@ export const increaseStock = async ({
 
     const balanceBefore = stockItem?.quantities?.onHand || 0;
 
+    let openQtyToAdd = quantity;
+    let balanceQtyToAdd = 0;
+    if (openQuantity !== undefined && openQuantity !== null) {
+        openQtyToAdd = Number(openQuantity);
+        balanceQtyToAdd = Math.max(0, quantity - openQtyToAdd);
+    }
+
     if (!stockItem) {
         stockItem = new StockItem({
             productId,
@@ -76,15 +89,24 @@ export const increaseStock = async ({
             batchNumber,
             unitOfMeasure: product.unitOfMeasure,
             costPerUnit,
-            quantities: { onHand: quantity, reserved: 0, available: quantity },
+            quantities: {
+                onHand: quantity,
+                reserved: 0,
+                available: openQtyToAdd,
+                openStock: openQtyToAdd,
+                balanceStock: balanceQtyToAdd,
+            },
         });
     } else {
         // Weighted average cost
-        const oldValue = stockItem.quantities.onHand * stockItem.costPerUnit;
+        const oldValue = (stockItem.quantities.onHand || 0) * stockItem.costPerUnit;
         const newValue = quantity * costPerUnit;
-        const totalQty = stockItem.quantities.onHand + quantity;
+        const totalQty = (stockItem.quantities.onHand || 0) + quantity;
         stockItem.costPerUnit = totalQty > 0 ? +((oldValue + newValue) / totalQty).toFixed(2) : costPerUnit;
-        stockItem.quantities.onHand += quantity;
+
+        stockItem.quantities.openStock = (stockItem.quantities.openStock || 0) + openQtyToAdd;
+        stockItem.quantities.balanceStock = (stockItem.quantities.balanceStock || 0) + balanceQtyToAdd;
+        stockItem.quantities.onHand = stockItem.quantities.openStock + stockItem.quantities.balanceStock;
     }
     stockItem.lastMovementDate = new Date();
     await stockItem.save({ session: session || undefined });
@@ -113,10 +135,17 @@ export const increaseStock = async ({
     await movement.save({ session: session || undefined });
 
     // Update product's last purchase cost & average cost
-    if (movementType === 'purchase_receipt' || movementType === 'opening_stock') {
+    if (movementType === 'purchase_receipt' || movementType === 'opening_stock' || movementType === 'production_receipt') {
+        const updateDoc = {
+            'costs.lastPurchaseCost': costPerUnit,
+            'costs.averageCost': stockItem.costPerUnit
+        };
+        if (!product.basePrice || product.basePrice === 0) {
+            updateDoc.basePrice = costPerUnit;
+        }
         await Product.findByIdAndUpdate(
             productId,
-            { 'costs.lastPurchaseCost': costPerUnit, 'costs.averageCost': stockItem.costPerUnit },
+            updateDoc,
             { session: session || null }
         );
     }
@@ -136,72 +165,195 @@ export const decreaseStock = async ({
 }) => {
     if (!quantity || quantity <= 0) throw new Error('Quantity must be greater than 0');
 
-    let stockItem = await StockItem.findOne({
-        productId, warehouseId, batchNumber,
-    }).session(session || null);
+    const product = await Product.findById(productId).session(session || null);
+    if (!product) throw new Error(`Product ${productId} not found`);
 
-    if (!stockItem && !batchNumber) {
-        // Fallback: If no batchNumber was requested, find any batch with stock, sorting by FIFO (createdAt: 1)
-        stockItem = await StockItem.findOne({
-            productId,
-            warehouseId,
-            'quantities.onHand': { $gt: 0 }
-        })
-        .sort({ createdAt: 1 })
-        .session(session || null);
+    // Case 1: Specific batch number requested
+    if (batchNumber) {
+        let stockItem = await StockItem.findOne({
+            productId, warehouseId, batchNumber,
+        }).session(session || null);
 
-        // If still no stock item found with positive stock, just find any stock item for this product/warehouse to allow negative adjustments if allowed
         if (!stockItem) {
-            stockItem = await StockItem.findOne({
-                productId,
-                warehouseId
-            })
-            .sort({ createdAt: 1 })
-            .session(session || null);
+            if (allowNegative) {
+                stockItem = new StockItem({
+                    productId,
+                    productCode: product.productCode,
+                    productName: product.name,
+                    warehouseId,
+                    batchNumber,
+                    unitOfMeasure: product.unitOfMeasure,
+                    costPerUnit: product.costs?.lastPurchaseCost || 0,
+                    quantities: { onHand: 0, reserved: 0, available: 0, openStock: 0, balanceStock: 0 },
+                });
+            } else {
+                throw new Error(`No stock found for batch ${batchNumber} in the selected warehouse`);
+            }
         }
+
+        const balanceBefore = stockItem.quantities.onHand;
+        const openStockAvailable = stockItem.quantities.openStock || 0;
+
+        if (!allowNegative && openStockAvailable < quantity) {
+            throw new Error(
+                `Insufficient open stock in batch ${batchNumber}. Open stock: ${openStockAvailable}, requested: ${quantity}`
+            );
+        }
+
+        if (allowNegative) {
+            stockItem.quantities.openStock = (stockItem.quantities.openStock || 0) - quantity;
+        } else {
+            stockItem.quantities.openStock = Math.max(0, (stockItem.quantities.openStock || 0) - quantity);
+        }
+        stockItem.quantities.onHand = stockItem.quantities.openStock + (stockItem.quantities.balanceStock || 0);
+        stockItem.lastMovementDate = new Date();
+        await stockItem.save({ session: session || undefined });
+        checkAndAlertLowStock(productId, session);
+
+        const movement = new StockMovement({
+            productId,
+            productCode: product.productCode,
+            productName: product.name,
+            batchNumber,
+            movementType,
+            direction: 'out',
+            quantity,
+            unitOfMeasure: stockItem.unitOfMeasure,
+            warehouseId,
+            costPerUnit: stockItem.costPerUnit,
+            totalCost: +(quantity * stockItem.costPerUnit).toFixed(2),
+            balanceBefore,
+            balanceAfter: stockItem.quantities.onHand,
+            sourceDocument,
+            reason: reason || `Stock decreased for batch ${batchNumber}`,
+            notes,
+            performedBy: userId,
+            createdAt: new Date(),
+        });
+        await movement.save({ session: session || undefined });
+
+        return { stockItem, movement };
     }
 
-    if (!stockItem) {
-        throw new Error(`No stock found for this product in the selected warehouse`);
-    }
+    // Case 2: No specific batch number requested (FIFO depletion across batches)
+    const stockItems = await StockItem.find({
+        productId,
+        warehouseId
+    })
+    .sort({ createdAt: 1 })
+    .session(session || null);
 
-    const balanceBefore = stockItem.quantities.onHand;
+    const totalAvailable = stockItems.reduce((sum, item) => sum + Math.max(0, item.quantities?.openStock || 0), 0);
 
-    if (!allowNegative && stockItem.quantities.onHand < quantity) {
+    if (!allowNegative && totalAvailable < quantity) {
         throw new Error(
-            `Insufficient stock. On hand: ${stockItem.quantities.onHand}, requested: ${quantity}`
+            `Insufficient open stock. Total open stock across all batches: ${totalAvailable}, requested: ${quantity}`
         );
     }
 
-    stockItem.quantities.onHand -= quantity;
-    stockItem.lastMovementDate = new Date();
-    await stockItem.save({ session: session || undefined });
+    let remainingQty = quantity;
+    let totalCostOfDepleted = 0;
+    let lastModifiedStockItem = null;
+    let lastMovement = null;
+
+    const positiveItems = stockItems.filter(item => (item.quantities?.openStock || 0) > 0);
+
+    for (const item of positiveItems) {
+        if (remainingQty <= 0) break;
+
+        const availableQty = item.quantities.openStock || 0;
+        const qtyToDeduct = Math.min(availableQty, remainingQty);
+
+        const balanceBefore = item.quantities.onHand;
+        item.quantities.openStock = (item.quantities.openStock || 0) - qtyToDeduct;
+        item.quantities.onHand = item.quantities.openStock + (item.quantities.balanceStock || 0);
+        item.lastMovementDate = new Date();
+        await item.save({ session: session || undefined });
+
+        remainingQty -= qtyToDeduct;
+        totalCostOfDepleted += qtyToDeduct * item.costPerUnit;
+        lastModifiedStockItem = item;
+
+        const movement = new StockMovement({
+            productId,
+            productCode: product.productCode,
+            productName: product.name,
+            batchNumber: item.batchNumber,
+            movementType,
+            direction: 'out',
+            quantity: qtyToDeduct,
+            unitOfMeasure: item.unitOfMeasure,
+            warehouseId,
+            costPerUnit: item.costPerUnit,
+            totalCost: +(qtyToDeduct * item.costPerUnit).toFixed(2),
+            balanceBefore,
+            balanceAfter: item.quantities.onHand,
+            sourceDocument,
+            reason: reason || `FIFO depletion of batch ${item.batchNumber || 'Standard'}`,
+            notes,
+            performedBy: userId,
+            createdAt: new Date(),
+        });
+        await movement.save({ session: session || undefined });
+        lastMovement = movement;
+    }
+
+    // If there is still remaining quantity to deduct (only possible if allowNegative is true)
+    if (remainingQty > 0) {
+        let targetItem = stockItems[0];
+        if (!targetItem) {
+            targetItem = new StockItem({
+                productId,
+                productCode: product.productCode,
+                productName: product.name,
+                warehouseId,
+                batchNumber: null,
+                unitOfMeasure: product.unitOfMeasure,
+                costPerUnit: product.costs?.lastPurchaseCost || 0,
+                quantities: { onHand: 0, reserved: 0, available: 0, openStock: 0, balanceStock: 0 },
+            });
+        }
+
+        const balanceBefore = targetItem.quantities.onHand;
+        targetItem.quantities.openStock = (targetItem.quantities.openStock || 0) - remainingQty;
+        targetItem.quantities.onHand = targetItem.quantities.openStock + (targetItem.quantities.balanceStock || 0);
+        targetItem.lastMovementDate = new Date();
+        await targetItem.save({ session: session || undefined });
+
+        totalCostOfDepleted += remainingQty * targetItem.costPerUnit;
+        lastModifiedStockItem = targetItem;
+
+        const movement = new StockMovement({
+            productId,
+            productCode: product.productCode,
+            productName: product.name,
+            batchNumber: targetItem.batchNumber,
+            movementType,
+            direction: 'out',
+            quantity: remainingQty,
+            unitOfMeasure: targetItem.unitOfMeasure,
+            warehouseId,
+            costPerUnit: targetItem.costPerUnit,
+            totalCost: +(remainingQty * targetItem.costPerUnit).toFixed(2),
+            balanceBefore,
+            balanceAfter: targetItem.quantities.onHand,
+            sourceDocument,
+            reason: reason || `Negative stock depletion of batch ${targetItem.batchNumber || 'Standard'}`,
+            notes,
+            performedBy: userId,
+            createdAt: new Date(),
+        });
+        await movement.save({ session: session || undefined });
+        lastMovement = movement;
+    }
+
     checkAndAlertLowStock(productId, session);
 
-    const product = await Product.findById(productId).session(session || null);
+    // Return virtual stock item with weighted average cost of depleted items
+    const virtualStockItem = lastModifiedStockItem.toObject ? lastModifiedStockItem.toObject() : { ...lastModifiedStockItem };
+    virtualStockItem.costPerUnit = quantity > 0 ? +(totalCostOfDepleted / quantity).toFixed(2) : 0;
 
-    const movement = new StockMovement({
-        productId,
-        productCode: product?.productCode,
-        productName: product?.name,
-        batchNumber: stockItem.batchNumber || batchNumber,
-        movementType,
-        direction: 'out',
-        quantity,
-        unitOfMeasure: stockItem.unitOfMeasure,
-        warehouseId,
-        costPerUnit: stockItem.costPerUnit,
-        totalCost: +(quantity * stockItem.costPerUnit).toFixed(2),
-        balanceBefore,
-        balanceAfter: stockItem.quantities.onHand,
-        sourceDocument,
-        reason,
-        notes,
-        performedBy: userId,
-    });
-    await movement.save({ session: session || undefined });
-
-    return { stockItem, movement };
+    return { stockItem: virtualStockItem, movement: lastMovement };
 };
 
 /**

@@ -8,4 +8,8 @@ export const stockApi = {
     openingStock: async (data) => (await api.post('/stock/opening', data)).data,
     transfer: async (data) => (await api.post('/stock/transfer', data)).data,
     adjust: async (data) => (await api.post('/stock/adjustment', data)).data,
+    convert: async (data) => (await api.post('/stock/convert', data)).data,
+    convertBom: async (data) => (await api.post('/stock/convert-bom', data)).data,
+    convertRecipe: async (data) => (await api.post('/stock/convert-recipe', data)).data,
+    release: async (data) => (await api.post('/stock/release', data)).data,
 };

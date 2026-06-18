@@ -52,6 +52,9 @@ export default function DashboardPage() {
 
     useEffect(() => {
         fetchDeptMetrics();
+        // Auto-refresh department metrics every 60 seconds
+        const interval = setInterval(fetchDeptMetrics, 60000);
+        return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {

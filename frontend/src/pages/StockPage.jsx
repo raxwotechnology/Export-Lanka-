@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Boxes, AlertTriangle, PackagePlus, ArrowRightLeft, Settings2, History } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
@@ -9,8 +10,11 @@ import Select from '../components/ui/Select';
 import Badge from '../components/ui/Badge';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
+import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
+import Textarea from '../components/ui/Textarea';
 
-import { useStockItems } from '../features/stock/useStock';
+import { useStockItems, useReleaseStock } from '../features/stock/useStock';
 import { useWarehouses } from '../features/warehouses/useWarehouses';
 import { useAuthStore } from '../store/authStore';
 
@@ -21,11 +25,18 @@ export default function StockPage() {
 
     const [filters, setFilters] = useState({
         search: '', warehouseId: '', lowStock: '',
+        stockType: '', // 'open' or 'balance' or ''
         page: 1, limit: 20,
     });
 
+    const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+    const [selectedItemForRelease, setSelectedItemForRelease] = useState(null);
+    const [releaseQty, setReleaseQty] = useState('');
+    const [releaseNotes, setReleaseNotes] = useState('');
+
     const { data, isLoading } = useStockItems(filters);
     const { data: warehousesData } = useWarehouses();
+    const releaseMutation = useReleaseStock();
 
     const items = data?.data || [];
     const total = data?.total || 0;
@@ -34,6 +45,37 @@ export default function StockPage() {
     const warehouseOptions = (warehousesData?.data || []).map((w) => ({
         value: w._id, label: `${w.name} (${w.warehouseCode})`,
     }));
+
+    const handleOpenReleaseModal = (item) => {
+        setSelectedItemForRelease(item);
+        setReleaseQty('');
+        setReleaseNotes('');
+        setIsReleaseModalOpen(true);
+    };
+
+    const handleReleaseSubmit = async (e) => {
+        e.preventDefault();
+        if (!selectedItemForRelease) return;
+        if (!releaseQty || Number(releaseQty) <= 0) {
+            return toast.error('Please enter a valid quantity');
+        }
+        if (Number(releaseQty) > selectedItemForRelease.quantities.balanceStock) {
+            return toast.error(`Insufficient balance stock. Max available: ${selectedItemForRelease.quantities.balanceStock}`);
+        }
+
+        try {
+            await releaseMutation.mutateAsync({
+                productId: selectedItemForRelease.productId?._id,
+                warehouseId: selectedItemForRelease.warehouseId?._id,
+                batchNumber: selectedItemForRelease.batchNumber,
+                quantity: Number(releaseQty),
+                notes: releaseNotes
+            });
+            setIsReleaseModalOpen(false);
+        } catch (err) {
+            // Toast handled by mutation hook
+        }
+    };
 
     const fmt = (n) => new Intl.NumberFormat('en-LK', { minimumFractionDigits: 2 }).format(n || 0);
     const fmtMoney = (n) => new Intl.NumberFormat('en-LK', {
@@ -134,6 +176,18 @@ export default function StockPage() {
                             onChange={(e) => setFilters((f) => ({ ...f, warehouseId: e.target.value, page: 1 }))}
                         />
                     </div>
+                    <div className="w-full sm:w-44">
+                        <Select
+                            placeholder="All Stock Types"
+                            options={[
+                                { value: '', label: 'All Stock Types' },
+                                { value: 'open', label: 'Open Stock only' },
+                                { value: 'balance', label: 'Balance Stock only' }
+                            ]}
+                            value={filters.stockType}
+                            onChange={(e) => setFilters((f) => ({ ...f, stockType: e.target.value, page: 1 }))}
+                        />
+                    </div>
                     <div className="w-full sm:w-40">
                         <Select
                             placeholder="All Items"
@@ -166,11 +220,13 @@ export default function StockPage() {
                                     <tr>
                                         <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Product</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Warehouse</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">On Hand</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Reserved</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Available</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Batch</th>
+                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Open Stock (Avail / Res)</th>
+                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Balance Stock</th>
+                                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total Stock</th>
                                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Value</th>
                                         <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -186,20 +242,49 @@ export default function StockPage() {
                                                     <p className="text-sm text-gray-700">{r.warehouseId?.name}</p>
                                                     <p className="text-xs font-mono text-gray-400">{r.warehouseId?.warehouseCode}</p>
                                                 </td>
+                                                <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                                                    {r.batchNumber ? (
+                                                        <Badge variant="warning">{r.batchNumber}</Badge>
+                                                    ) : (
+                                                        <span className="text-gray-400 text-xs">Standard</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-3 text-right text-sm font-medium text-gray-800 whitespace-nowrap">
+                                                    <div>
+                                                        <span>{fmt(r.quantities.openStock)}</span>{' '}
+                                                        <span className="text-xs text-gray-400">{r.unitOfMeasure}</span>
+                                                    </div>
+                                                    <div className="text-[10px] text-gray-500 mt-0.5">
+                                                        Avail: <span className="text-green-700 font-semibold">{fmt(Math.max(0, r.quantities.openStock - r.quantities.reserved))}</span>
+                                                        {r.quantities.reserved > 0 && (
+                                                            <> · Res: <span className="text-amber-600 font-medium">{fmt(r.quantities.reserved)}</span></>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-sm font-medium text-gray-600 whitespace-nowrap">
+                                                    {fmt(r.quantities.balanceStock)} <span className="text-xs text-gray-400">{r.unitOfMeasure}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-sm font-semibold text-gray-800 whitespace-nowrap">
                                                     {fmt(r.quantities.onHand)} <span className="text-xs text-gray-400">{r.unitOfMeasure}</span>
-                                                </td>
-                                                <td className={`px-4 py-3 text-right text-sm whitespace-nowrap ${r.quantities.reserved > 0 ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
-                                                    {fmt(r.quantities.reserved)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-sm font-semibold text-green-700 whitespace-nowrap">
-                                                    {fmt(r.quantities.onHand - r.quantities.reserved)}
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-sm text-gray-600 whitespace-nowrap">
                                                     {fmtMoney(r.totalValue)}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <Badge variant={s.variant}>{s.label}</Badge>
+                                                </td>
+                                                <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                    {canAdjust && (r.quantities.balanceStock || 0) > 0 ? (
+                                                        <Button
+                                                            variant="primary"
+                                                            size="sm"
+                                                            onClick={() => handleOpenReleaseModal(r)}
+                                                        >
+                                                            Release
+                                                        </Button>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">—</span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -212,7 +297,7 @@ export default function StockPage() {
                         <div className="sm:hidden divide-y divide-gray-100">
                             {items.map((r) => {
                                 const s = getStockStatus(r);
-                                const available = r.quantities.onHand - r.quantities.reserved;
+                                const available = Math.max(0, r.quantities.openStock - r.quantities.reserved);
                                 return (
                                     <div key={r._id} className="px-4 py-4">
                                         {/* Header row */}
@@ -224,30 +309,44 @@ export default function StockPage() {
                                             <Badge variant={s.variant} className="ml-2 flex-shrink-0">{s.label}</Badge>
                                         </div>
 
-                                        {/* Warehouse */}
-                                        <p className="text-xs text-gray-500 mb-3">
-                                            📦 {r.warehouseId?.name}
-                                            {r.warehouseId?.warehouseCode && ` · ${r.warehouseId.warehouseCode}`}
-                                        </p>
+                                        {/* Warehouse & Batch */}
+                                        <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
+                                            <span>📦 {r.warehouseId?.name}{r.warehouseId?.warehouseCode && ` · ${r.warehouseId.warehouseCode}`}</span>
+                                            <span>Batch: <span className="font-semibold text-gray-700">{r.batchNumber || "Standard"}</span></span>
+                                        </div>
 
                                         {/* Quantities grid */}
                                         <div className="grid grid-cols-3 gap-2 text-xs">
-                                            <div className="bg-gray-50 rounded-lg p-2 text-center">
-                                                <p className="text-gray-400 mb-0.5">On Hand</p>
-                                                <p className="font-bold text-gray-800 text-sm">{fmt(r.quantities.onHand)}</p>
-                                                <p className="text-gray-400">{r.unitOfMeasure}</p>
+                                            <div className="bg-blue-50 rounded-lg p-2 text-center">
+                                                <p className="text-blue-500 mb-0.5 font-medium">Open Stock</p>
+                                                <p className="font-bold text-blue-950 text-sm">{fmt(r.quantities.openStock)}</p>
+                                                <p className="text-[10px] text-blue-600">Avail: {fmt(available)}</p>
                                             </div>
                                             <div className="bg-amber-50 rounded-lg p-2 text-center">
-                                                <p className="text-amber-500 mb-0.5">Reserved</p>
-                                                <p className={`font-bold text-sm ${r.quantities.reserved > 0 ? 'text-amber-700' : 'text-gray-400'}`}>
-                                                    {fmt(r.quantities.reserved)}
-                                                </p>
+                                                <p className="text-amber-500 mb-0.5 font-medium">Balance Stock</p>
+                                                <p className="font-bold text-amber-700 text-sm">{fmt(r.quantities.balanceStock)}</p>
+                                                <p className="text-[10px] text-gray-400">{r.unitOfMeasure}</p>
                                             </div>
-                                            <div className="bg-green-50 rounded-lg p-2 text-center">
-                                                <p className="text-green-500 mb-0.5">Available</p>
-                                                <p className="font-bold text-green-700 text-sm">{fmt(available)}</p>
+                                            <div className="bg-gray-50 rounded-lg p-2 text-center">
+                                                <p className="text-gray-500 mb-0.5 font-medium">Total Stock</p>
+                                                <p className="font-bold text-gray-800 text-sm">{fmt(r.quantities.onHand)}</p>
+                                                <p className="text-[10px] text-gray-400">{r.unitOfMeasure}</p>
                                             </div>
                                         </div>
+
+                                        {/* Mobile Release Action */}
+                                        {canAdjust && (r.quantities.balanceStock || 0) > 0 && (
+                                            <div className="mt-3">
+                                                <Button
+                                                    fullWidth
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleOpenReleaseModal(r)}
+                                                >
+                                                    Release Stock to POS
+                                                </Button>
+                                            </div>
+                                        )}
 
                                         {/* Value */}
                                         <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-gray-100">
@@ -263,6 +362,82 @@ export default function StockPage() {
                             page={filters.page} totalPages={totalPages} total={total}
                             onPageChange={(p) => setFilters((f) => ({ ...f, page: p }))}
                         />
+
+                        {/* Release Stock Modal */}
+                        <Modal
+                            isOpen={isReleaseModalOpen}
+                            onClose={() => setIsReleaseModalOpen(false)}
+                            title="Release Stock to POS"
+                            size="md"
+                        >
+                            <form onSubmit={handleReleaseSubmit} className="space-y-4">
+                                {selectedItemForRelease && (
+                                    <>
+                                        <div className="bg-gray-50 p-3 rounded-lg text-sm space-y-1">
+                                            <p>
+                                                <span className="text-gray-500">Product:</span>{' '}
+                                                <span className="font-semibold text-gray-800">
+                                                    {selectedItemForRelease.productName}
+                                                </span>
+                                            </p>
+                                            <p>
+                                                <span className="text-gray-500">Warehouse:</span>{' '}
+                                                <span className="text-gray-700">
+                                                    {selectedItemForRelease.warehouseId?.name}
+                                                </span>
+                                            </p>
+                                            <p>
+                                                <span className="text-gray-500">Batch Code:</span>{' '}
+                                                <span className="font-mono text-gray-700">
+                                                    {selectedItemForRelease.batchNumber || 'Standard'}
+                                                </span>
+                                            </p>
+                                            <p>
+                                                <span className="text-gray-500">Current Balance Stock:</span>{' '}
+                                                <span className="font-bold text-amber-700">
+                                                    {fmt(selectedItemForRelease.quantities.balanceStock)} {selectedItemForRelease.unitOfMeasure}
+                                                </span>
+                                            </p>
+                                            <p>
+                                                <span className="text-gray-500">Current Open Stock:</span>{' '}
+                                                <span className="font-bold text-blue-700">
+                                                    {fmt(selectedItemForRelease.quantities.openStock)} {selectedItemForRelease.unitOfMeasure}
+                                                </span>
+                                            </p>
+                                        </div>
+
+                                        <Input
+                                            label={`Quantity to Release (${selectedItemForRelease.unitOfMeasure})`}
+                                            type="number"
+                                            step="0.01"
+                                            min="0.01"
+                                            max={selectedItemForRelease.quantities.balanceStock}
+                                            value={releaseQty}
+                                            onChange={(e) => setReleaseQty(e.target.value)}
+                                            placeholder="Enter quantity to release"
+                                            required
+                                        />
+
+                                        <Textarea
+                                            label="Notes"
+                                            value={releaseNotes}
+                                            onChange={(e) => setReleaseNotes(e.target.value)}
+                                            placeholder="Optional notes..."
+                                            rows={3}
+                                        />
+
+                                        <div className="flex justify-end gap-2 pt-2">
+                                            <Button variant="outline" type="button" onClick={() => setIsReleaseModalOpen(false)}>
+                                                Cancel
+                                            </Button>
+                                            <Button variant="primary" type="submit" loading={releaseMutation.isLoading}>
+                                                Confirm Release
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                            </form>
+                        </Modal>
                     </>
                 )}
             </Card>

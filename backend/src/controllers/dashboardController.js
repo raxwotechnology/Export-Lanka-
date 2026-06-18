@@ -16,6 +16,7 @@ import Payroll from '../models/Payroll.js';
 import GoodsReceiptNote from '../models/GoodsReceiptNote.js';
 import PettyCash from '../models/PettyCash.js';
 import ProductionBatch from '../models/ProductionBatch.js';
+import MonthlyTarget from '../models/MonthlyTarget.js';
 
 /**
  * GET /api/dashboard/kpis
@@ -80,7 +81,7 @@ export const getDashboardKpis = asyncHandler(async (req, res) => {
         {
             $group: {
                 _id: '$productId',
-                totalAvailable: { $sum: { $subtract: ['$quantities.onHand', '$quantities.reserved'] } },
+                totalAvailable: { $sum: { $subtract: [{ $ifNull: ['$quantities.openStock', '$quantities.onHand'] }, '$quantities.reserved'] } },
             },
         },
         {
@@ -294,7 +295,7 @@ export const getDepartmentDashboardMetrics = asyncHandler(async (req, res) => {
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
     // Fetch targets for current month
-    const targetDoc = await mongoose.model('MonthlyTarget').findOne({
+    const targetDoc = await MonthlyTarget.findOne({
         year: today.getFullYear(),
         month: today.getMonth() + 1
     });
@@ -323,7 +324,7 @@ export const getDepartmentDashboardMetrics = asyncHandler(async (req, res) => {
                 name: '$product.name',
                 productCode: '$product.productCode',
                 productType: '$product.productType',
-                available: { $subtract: ['$quantities.onHand', '$quantities.reserved'] },
+                available: { $subtract: [{ $ifNull: ['$quantities.openStock', '$quantities.onHand'] }, '$quantities.reserved'] },
                 unit: '$unitOfMeasure'
             }
         },

@@ -52,7 +52,10 @@ export default function SalesOrderFormPage() {
     const { data: warehousesData } = useWarehouses({ isActive: true });
 
     const customers = customersData?.data || [];
-    const products = productsData?.data || [];
+    const NON_SELLABLE_TYPES = ['raw_material', 'packaging', 'consumable', 'service'];
+    const products = (productsData?.data || []).filter(
+        (p) => p.canBeSold !== false && !NON_SELLABLE_TYPES.includes(p.productType)
+    );
     const warehouses = warehousesData?.data || [];
 
     // Set default warehouse on load
@@ -117,7 +120,7 @@ export default function SalesOrderFormPage() {
                     : lowStock
                         ? `⚠ Only ${available} left`
                         : `✓ ${available} available`
-                    } · LKR ${p.basePrice}`,
+                    } · LKR ${p.basePrice || p.costs?.lastPurchaseCost || p.costs?.averageCost || 0}`,
                 disabled: outOfStock,
             };
         });
@@ -142,7 +145,7 @@ export default function SalesOrderFormPage() {
         if (field === 'productId' && value) {
             const p = products.find((pr) => pr._id === value);
             if (p) {
-                let price = p.basePrice;
+                let price = p.basePrice || p.costs?.lastPurchaseCost || p.costs?.averageCost || 0;
                 if (selectedCustomer?.defaultDiscountPercent) {
                     price = price * (1 - selectedCustomer.defaultDiscountPercent / 100);
                 }

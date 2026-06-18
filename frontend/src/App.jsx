@@ -45,6 +45,8 @@ import BankAccountsPage from './pages/BankAccountsPage';
 import BomsPage from './pages/BomsPage';
 import BomFormPage from './pages/BomFormPage';
 import BomDetailPage from './pages/BomDetailPage';
+import InventoryRecipesPage from './pages/InventoryRecipesPage';
+import InventoryRecipeFormPage from './pages/InventoryRecipeFormPage';
 import ProductionOrdersPage from './pages/ProductionOrdersPage';
 import ProductionOrderFormPage from './pages/ProductionOrderFormPage';
 import ProductionOrderDetailPage from './pages/ProductionOrderDetailPage';
@@ -167,6 +169,9 @@ function App() {
         <Route path="/boms/new" element={<ProtectedRoute requiredPermission="bom.manage"><BomFormPage /></ProtectedRoute>} />
         <Route path="/boms/:id" element={<ProtectedRoute requiredPermission="bom.view"><BomDetailPage /></ProtectedRoute>} />
         <Route path="/boms/:id/edit" element={<ProtectedRoute requiredPermission="bom.manage"><BomFormPage /></ProtectedRoute>} />
+        <Route path="/inventory-recipes" element={<ProtectedRoute requiredPermission="bom.view"><InventoryRecipesPage /></ProtectedRoute>} />
+        <Route path="/inventory-recipes/new" element={<ProtectedRoute requiredPermission="bom.manage"><InventoryRecipeFormPage /></ProtectedRoute>} />
+        <Route path="/inventory-recipes/:id/edit" element={<ProtectedRoute requiredPermission="bom.manage"><InventoryRecipeFormPage /></ProtectedRoute>} />
         <Route path="/production-orders" element={<ProtectedRoute requiredPermission="production.view"><ProductionOrdersPage /></ProtectedRoute>} />
         <Route path="/production-orders/new" element={<ProtectedRoute requiredPermission="production.manage"><ProductionOrderFormPage /></ProtectedRoute>} />
         <Route path="/production-orders/:id" element={<ProtectedRoute requiredPermission="production.view"><ProductionOrderDetailPage /></ProtectedRoute>} />

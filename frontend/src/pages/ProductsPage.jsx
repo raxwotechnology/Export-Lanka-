@@ -114,7 +114,10 @@ export default function ProductsPage() {
         {
             key: 'basePrice',
             label: 'Price',
-            render: (row) => <span className="font-medium">{formatPrice(row.basePrice)}</span>,
+            render: (row) => {
+                const displayPrice = row.basePrice || row.costs?.lastPurchaseCost || row.costs?.averageCost || 0;
+                return <span className="font-medium">{formatPrice(displayPrice)}</span>;
+            },
         },
         {
             key: 'status',
@@ -217,8 +220,9 @@ export default function ProductsPage() {
                     </div>
                     <div className="w-40">
                         <Select
-                            placeholder="All Statuses"
+                            placeholder="Active Only"
                             options={[
+                                { value: 'all', label: 'All Statuses' },
                                 { value: 'active', label: 'Active' },
                                 { value: 'inactive', label: 'Inactive' },
                                 { value: 'draft', label: 'Draft' },

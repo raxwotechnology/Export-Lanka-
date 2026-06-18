@@ -10,6 +10,7 @@ import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import EmptyState from '../components/ui/EmptyState';
 import { useAuthStore } from '../store/authStore';
+import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
 
 export default function GrnsPage() {
     const { user } = useAuthStore();
@@ -180,8 +181,20 @@ export default function GrnsPage() {
         if (formData.sourceType === 'own_farm' && !formData.farmId) return toast.error('Please select a farm');
         if (formData.items.length === 0) return toast.error('Please add at least one line item');
 
+        const payload = { ...formData };
+        if (!payload.purchaseOrderId) {
+            delete payload.purchaseOrderId;
+        }
+        if (payload.sourceType === 'supplier') {
+            delete payload.farmId;
+            if (!payload.supplierId) delete payload.supplierId;
+        } else if (payload.sourceType === 'own_farm') {
+            delete payload.supplierId;
+            if (!payload.farmId) delete payload.farmId;
+        }
+
         try {
-            await api.post('/grns', formData);
+            await api.post('/grns', payload);
             toast.success('Goods Receipt Note recorded in pending QA approval queue');
             setIsFormOpen(false);
             fetchAllData();
@@ -706,17 +719,22 @@ export default function GrnsPage() {
                             <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Add Received Product</h4>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
                                 <div className="md:col-span-2">
-                                    <label className="text-xs font-semibold text-gray-500 block mb-1">Product *</label>
-                                    <select
+                                    <ProductAutocompleteSelect
+                                        label="Product *"
+                                        placeholder="Type to search or add..."
+                                        products={products}
                                         value={newItem.productId}
-                                        onChange={(e) => setNewItem(p => ({ ...p, productId: e.target.value }))}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                                    >
-                                        <option value="">Select Product</option>
-                                        {products.map(p => (
-                                            <option key={p._id} value={p._id}>{p.name} ({p.productCode})</option>
-                                        ))}
-                                    </select>
+                                        productType="raw_material" // Default type to create
+                                        onChange={(val, newProd) => {
+                                            if (newProd) {
+                                                setProducts(prev => {
+                                                    if (prev.some(p => p._id === newProd._id)) return prev;
+                                                    return [...prev, newProd];
+                                                });
+                                            }
+                                            setNewItem(p => ({ ...p, productId: val }));
+                                        }}
+                                    />
                                 </div>
                                 <div>
                                     <label className="text-xs font-semibold text-gray-500 block mb-1">Quantity *</label>

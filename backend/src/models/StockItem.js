@@ -24,7 +24,9 @@ const stockItemSchema = new mongoose.Schema(
         quantities: {
             onHand: { type: Number, default: 0 },      // physical stock
             reserved: { type: Number, default: 0 },    // held for pending orders
-            available: { type: Number, default: 0 },   // onHand - reserved (computed)
+            available: { type: Number, default: 0 },   // openStock - reserved (computed)
+            openStock: { type: Number, default: 0 },   // stock made available to sell (POS)
+            balanceStock: { type: Number, default: 0 },// stock remaining/unreleased from production/conversion
         },
         unitOfMeasure: { type: String, trim: true },
 
@@ -50,7 +52,18 @@ stockItemSchema.index({ expiryDate: 1 });
 
 // Keep available in sync before save
 stockItemSchema.pre('save', function () {
-    this.quantities.available = Math.max(0, this.quantities.onHand - this.quantities.reserved);
+    // If openStock and balanceStock are both 0 but onHand is positive (legacy items),
+    // default openStock to onHand to prevent zero stock on legacy products.
+    if (!this.quantities.openStock && !this.quantities.balanceStock && this.quantities.onHand > 0) {
+        this.quantities.openStock = this.quantities.onHand;
+    }
+
+    // Force physical stock (onHand) to always equal the sum of open and balance stock
+    this.quantities.onHand = (this.quantities.openStock || 0) + (this.quantities.balanceStock || 0);
+
+    // available stock is what can actually be sold (openStock minus any reserved stock)
+    this.quantities.available = Math.max(0, (this.quantities.openStock || 0) - (this.quantities.reserved || 0));
+
     this.totalValue = +(this.quantities.onHand * this.costPerUnit).toFixed(2);
 });
 

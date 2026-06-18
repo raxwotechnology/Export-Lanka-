@@ -37,7 +37,7 @@ export const getStockValuation = asyncHandler(async (req, res) => {
                 warehouseCode: '$warehouse.warehouseCode',
                 onHand: '$quantities.onHand',
                 reserved: '$quantities.reserved',
-                available: { $subtract: ['$quantities.onHand', '$quantities.reserved'] },
+                available: { $subtract: [{ $ifNull: ['$quantities.openStock', '$quantities.onHand'] }, '$quantities.reserved'] },
                 costPerUnit: 1,
                 totalValue: { $multiply: ['$quantities.onHand', '$costPerUnit'] },
                 batchNumber: 1,
@@ -275,9 +275,11 @@ export const getDailyStockStatus = asyncHandler(async (req, res) => {
     stockItems.forEach(item => {
         const pId = item.productId ? item.productId.toString() : 'unknown';
         if (!currentStockMap[pId]) {
-            currentStockMap[pId] = { onHand: 0, totalValue: 0, costSum: 0, costCount: 0 };
+            currentStockMap[pId] = { onHand: 0, totalValue: 0, costSum: 0, costCount: 0, openStock: 0, balanceStock: 0 };
         }
         currentStockMap[pId].onHand += item.quantities?.onHand || 0;
+        currentStockMap[pId].openStock += item.quantities?.openStock || 0;
+        currentStockMap[pId].balanceStock += item.quantities?.balanceStock || 0;
         currentStockMap[pId].totalValue += (item.quantities?.onHand || 0) * (item.costPerUnit || 0);
         currentStockMap[pId].costSum += item.costPerUnit || 0;
         currentStockMap[pId].costCount += 1;
@@ -288,7 +290,7 @@ export const getDailyStockStatus = asyncHandler(async (req, res) => {
 
     for (const product of products) {
         const pId = product._id.toString();
-        const currentData = currentStockMap[pId] || { onHand: 0, totalValue: 0, costSum: 0, costCount: 0 };
+        const currentData = currentStockMap[pId] || { onHand: 0, totalValue: 0, costSum: 0, costCount: 0, openStock: 0, balanceStock: 0 };
 
         // Average cost per unit is either current total value / current onHand,
         // or average of costPerUnit, or basePrice as fallback
@@ -326,11 +328,14 @@ export const getDailyStockStatus = asyncHandler(async (req, res) => {
             createdAt: { $gte: start, $lte: end }
         };
         if (warehouseId) movementsInFilter.warehouseId = warehouseId;
-        const movementsInRange = await StockMovement.find(movementsInFilter).select('quantity direction');
+        const movementsInRange = await StockMovement.find(movementsInFilter).select('quantity direction movementType');
 
         let received = 0;
         let issued = 0;
         movementsInRange.forEach(m => {
+            if (m.movementType === 'opening_stock') {
+                return; // skip adding to received/issued
+            }
             if (m.direction === 'in') {
                 received += m.quantity;
             } else if (m.direction === 'out') {
@@ -351,6 +356,8 @@ export const getDailyStockStatus = asyncHandler(async (req, res) => {
             received: parseFloat(received.toFixed(2)),
             issued: parseFloat(issued.toFixed(2)),
             closingStock: parseFloat(closingStock.toFixed(2)),
+            openStock: parseFloat((currentData.openStock || 0).toFixed(2)),
+            balanceStock: parseFloat((currentData.balanceStock || 0).toFixed(2)),
             costPerUnit: parseFloat(costPerUnit.toFixed(2)),
             closingValue: parseFloat(closingValue.toFixed(2))
         });

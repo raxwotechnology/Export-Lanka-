@@ -10,6 +10,7 @@ import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import EmptyState from '../components/ui/EmptyState';
 import { useAuthStore } from '../store/authStore';
+import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
 
 export default function FarmHarvestsPage() {
     const { user } = useAuthStore();
@@ -54,7 +55,7 @@ export default function FarmHarvestsPage() {
             setWarehouses(whRes.data.data || []);
             
             // Filter products of type raw_material
-            const rawProds = (prodRes.data.data || []).filter(p => p.type === 'raw_material');
+            const rawProds = (prodRes.data.data || []).filter(p => p.productType === 'raw_material');
             setProducts(rawProds);
         } catch (err) {
             toast.error('Failed to fetch harvest logs');
@@ -317,7 +318,7 @@ export default function FarmHarvestsPage() {
                                 value={formData.farmId}
                                 onChange={(e) => setFormData(p => ({ ...p, farmId: e.target.value }))}
                                 required
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none bg-white font-medium"
                             >
                                 {farms.map(f => (
                                     <option key={f._id} value={f._id}>{f.name} ({f.farmCode})</option>
@@ -331,7 +332,7 @@ export default function FarmHarvestsPage() {
                                 value={formData.warehouseId}
                                 onChange={(e) => setFormData(p => ({ ...p, warehouseId: e.target.value }))}
                                 required
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none bg-white font-medium"
                             >
                                 {warehouses.map(w => (
                                     <option key={w._id} value={w._id}>{w.name}</option>
@@ -346,29 +347,34 @@ export default function FarmHarvestsPage() {
                                 value={formData.harvestDate}
                                 onChange={(e) => setFormData(p => ({ ...p, harvestDate: e.target.value }))}
                                 required
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none font-medium"
                             />
                         </div>
                     </div>
 
                     <div className="border border-gray-150 p-4 rounded-xl bg-gray-50 space-y-4">
                         <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Add Harvested Crop</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                             <div className="md:col-span-2">
-                                <label className="text-xs font-semibold text-gray-500 block mb-1">Product (Raw Material) *</label>
-                                <select
+                                <ProductAutocompleteSelect
+                                    label="Product (Raw Material) *"
+                                    placeholder="Type to search or add..."
+                                    products={products}
                                     value={newItem.productId}
-                                    onChange={(e) => setNewItem(p => ({ ...p, productId: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                                >
-                                    <option value="">Select Raw Material</option>
-                                    {products.map(p => (
-                                        <option key={p._id} value={p._id}>{p.name} ({p.productCode})</option>
-                                    ))}
-                                </select>
+                                    productType="raw_material"
+                                    onChange={(val, newProd) => {
+                                        if (newProd) {
+                                            setProducts(prev => {
+                                                if (prev.some(p => p._id === newProd._id)) return prev;
+                                                return [...prev, newProd];
+                                            });
+                                        }
+                                        setNewItem(p => ({ ...p, productId: val }));
+                                    }}
+                                />
                             </div>
                             <div>
-                                <label className="text-xs font-semibold text-gray-500 block mb-1">Harvest Qty (Kg/Nos) *</label>
+                                <label className="text-xs font-bold text-gray-600 block mb-1">Harvest Qty (Kg/Nos) *</label>
                                 <input
                                     type="number"
                                     min="0.01"
@@ -376,11 +382,11 @@ export default function FarmHarvestsPage() {
                                     placeholder="0.00"
                                     value={newItem.quantity}
                                     onChange={(e) => setNewItem(p => ({ ...p, quantity: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-semibold text-gray-500 block mb-1">Est. Unit Price (Optional)</label>
+                                <label className="text-xs font-bold text-gray-600 block mb-1">Est. Unit Price (Optional)</label>
                                 <input
                                     type="number"
                                     min="0"
@@ -388,11 +394,11 @@ export default function FarmHarvestsPage() {
                                     placeholder="Base price"
                                     value={newItem.unitPrice}
                                     onChange={(e) => setNewItem(p => ({ ...p, unitPrice: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
                                 />
                             </div>
-                            <div className="md:col-span-4 flex justify-end">
-                                <Button type="button" variant="primary" onClick={handleAddItem}>
+                            <div className="md:col-span-1 flex items-end">
+                                <Button type="button" variant="primary" onClick={handleAddItem} className="w-full">
                                     Add Item
                                 </Button>
                             </div>
@@ -444,7 +450,7 @@ export default function FarmHarvestsPage() {
                             value={formData.notes}
                             onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))}
                             rows={3}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
                         />
                     </div>
 

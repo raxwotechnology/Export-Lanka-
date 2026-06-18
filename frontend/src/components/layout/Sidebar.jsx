@@ -7,7 +7,7 @@ import {
     RotateCcw, Wrench, AlertTriangle, FileMinus, X, Users as UsersIcon, Building2, Clock, Calendar as CalendarIcon, Plane, Calculator, DollarSign, Upload,
     ClipboardList, UserPlus, Ship, Layers, History, FileSpreadsheet,
     ChevronDown, ChevronRight, CheckSquare, ClipboardCheck, BadgeCheck,
-    PackageCheck, CreditCard, Tag, Mail, Sparkles, Home,
+    PackageCheck, CreditCard, Tag, Mail, Sparkles, Home, Search, Scale,
 } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
 
@@ -33,7 +33,8 @@ const menuGroups = [
             { label: 'Warehouses', icon: Warehouse, path: '/warehouses', permission: 'inventory.view' },
             { label: 'Stock', icon: Boxes, path: '/stock', permission: 'inventory.view' },
             { label: 'Raw Materials', icon: Layers, path: '/inventory/raw-materials', permission: 'inventory.view' },
-            { label: 'Direct Converter', icon: Workflow, path: '/inventory/converter', permission: 'inventory.adjust' },
+            { label: 'Inventory Converter', icon: Workflow, path: '/inventory/converter', permission: 'inventory.adjust' },
+            { label: 'Inventory Recipes', icon: Scale, path: '/inventory-recipes', permission: 'bom.view' },
         ],
     },
     {
@@ -219,21 +220,31 @@ function useIsCategoryActive(items) {
 }
 
 // ── Approval accordion sub-category component ────────────────────────────────
-function ApprovalCategory({ category, hasPermission, hasAnyPermission, isAdmin }) {
+function ApprovalCategory({ category, hasPermission, hasAnyPermission, isAdmin, searchQuery }) {
     const visibleItems = category.items.filter((item) => {
-        if (isAdmin) return true;
-        if (item.permission) return hasPermission(item.permission);
-        if (item.anyPermission) return hasAnyPermission(item.anyPermission);
-        return true;
+        const isPermitted = isAdmin ||
+            (!item.permission && !item.anyPermission) ||
+            (item.permission && hasPermission(item.permission)) ||
+            (item.anyPermission && hasAnyPermission(item.anyPermission));
+
+        if (!isPermitted) return false;
+
+        if (!searchQuery) return true;
+        return item.label.toLowerCase().includes(searchQuery.toLowerCase()) || 
+               category.label.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
     const isActive = useIsCategoryActive(visibleItems);
     const [isOpen, setIsOpen] = useState(isActive);
 
-    // Auto-open if a child is currently active
+    // Auto-open if a child is currently active or if searching
     useEffect(() => {
-        if (isActive) setIsOpen(true);
-    }, [isActive]);
+        if (searchQuery) {
+            setIsOpen(visibleItems.length > 0);
+        } else {
+            setIsOpen(isActive);
+        }
+    }, [searchQuery, isActive, visibleItems.length]);
 
     if (visibleItems.length === 0) return null;
 
@@ -300,6 +311,50 @@ export default function Sidebar({ isOpen, onClose }) {
     const sidebarRef = useRef(null);
     const { hasPermission, hasAnyPermission, isAdmin } = usePermission();
 
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Date Filter State
+    const [dateFilterEnabled, setDateFilterEnabled] = useState(() => {
+        return localStorage.getItem('dateFilterEnabled') === 'true';
+    });
+    const [filterMonth, setFilterMonth] = useState(() => {
+        return localStorage.getItem('filterMonth') || String(new Date().getMonth() + 1);
+    });
+    const [filterYear, setFilterYear] = useState(() => {
+        return localStorage.getItem('filterYear') || String(new Date().getFullYear());
+    });
+
+    const handleDateFilterToggle = (e) => {
+        const enabled = e.target.checked;
+        setDateFilterEnabled(enabled);
+        localStorage.setItem('dateFilterEnabled', String(enabled));
+        
+        if (enabled) {
+            if (!localStorage.getItem('filterMonth')) {
+                localStorage.setItem('filterMonth', filterMonth);
+            }
+            if (!localStorage.getItem('filterYear')) {
+                localStorage.setItem('filterYear', filterYear);
+            }
+        }
+        
+        window.location.reload();
+    };
+
+    const handleMonthChange = (e) => {
+        const m = e.target.value;
+        setFilterMonth(m);
+        localStorage.setItem('filterMonth', m);
+        window.location.reload();
+    };
+
+    const handleYearChange = (e) => {
+        const y = e.target.value;
+        setFilterYear(y);
+        localStorage.setItem('filterYear', y);
+        window.location.reload();
+    };
+
     // Close on outside click (mobile)
     useEffect(() => {
         if (!isOpen) return;
@@ -317,17 +372,26 @@ export default function Sidebar({ isOpen, onClose }) {
         };
     }, [isOpen, onClose]);
 
-    // Filter regular groups by permission
+    // Filter regular groups by permission and search query
     const visibleGroups = menuGroups
-        .map((g) => ({
-            ...g,
-            items: g.items.filter((item) => {
-                if (isAdmin) return true;
-                if (item.permission) return hasPermission(item.permission);
-                if (item.anyPermission) return hasAnyPermission(item.anyPermission);
-                return true;
-            }),
-        }))
+        .map((g) => {
+            const matchedItems = g.items.filter((item) => {
+                const isPermitted = isAdmin ||
+                    (!item.permission && !item.anyPermission) ||
+                    (item.permission && hasPermission(item.permission)) ||
+                    (item.anyPermission && hasAnyPermission(item.anyPermission));
+
+                if (!isPermitted) return false;
+
+                if (!searchQuery) return true;
+                return item.label.toLowerCase().includes(searchQuery.toLowerCase());
+            });
+
+            return {
+                ...g,
+                items: matchedItems
+            };
+        })
         .filter((g) => g.items.length > 0);
 
     return (
@@ -372,6 +436,78 @@ export default function Sidebar({ isOpen, onClose }) {
                         >
                             <X size={16} />
                         </button>
+                    </div>
+
+                    {/* ── Search and Date Filter Controls ── */}
+                    <div className="px-5 py-4 border-b border-gray-200 space-y-4 flex-shrink-0">
+                        {/* Search Menu Input */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search menu..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary-500 font-medium text-gray-800"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Date Filter */}
+                        <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Date Filter</span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={dateFilterEnabled}
+                                        onChange={handleDateFilterToggle}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-7 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary-600"></div>
+                                </label>
+                            </div>
+
+                            {dateFilterEnabled && (
+                                <div className="grid grid-cols-2 gap-2 pt-1">
+                                    <select
+                                        value={filterMonth}
+                                        onChange={handleMonthChange}
+                                        className="px-2 py-1.5 border border-gray-200 rounded-md text-[11px] focus:ring-2 focus:ring-primary-500 outline-none bg-white font-semibold text-gray-700 cursor-pointer"
+                                    >
+                                        <option value="1">January</option>
+                                        <option value="2">February</option>
+                                        <option value="3">March</option>
+                                        <option value="4">April</option>
+                                        <option value="5">May</option>
+                                        <option value="6">June</option>
+                                        <option value="7">July</option>
+                                        <option value="8">August</option>
+                                        <option value="9">September</option>
+                                        <option value="10">October</option>
+                                        <option value="11">November</option>
+                                        <option value="12">December</option>
+                                    </select>
+                                    <select
+                                        value={filterYear}
+                                        onChange={handleYearChange}
+                                        className="px-2 py-1.5 border border-gray-200 rounded-md text-[11px] focus:ring-2 focus:ring-primary-500 outline-none bg-white font-semibold text-gray-700 cursor-pointer"
+                                    >
+                                        <option value="2024">2024</option>
+                                        <option value="2025">2025</option>
+                                        <option value="2026">2026</option>
+                                        <option value="2027">2027</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* ── Scrollable nav ── */}
@@ -429,6 +565,7 @@ export default function Sidebar({ isOpen, onClose }) {
                                         hasPermission={hasPermission}
                                         hasAnyPermission={hasAnyPermission}
                                         isAdmin={isAdmin}
+                                        searchQuery={searchQuery}
                                     />
                                 ))}
                             </div>

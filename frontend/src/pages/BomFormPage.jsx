@@ -10,6 +10,7 @@ import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
+import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
 
 import { productsApi } from '../features/products/productsApi';
 import { useCreateBom, useUpdateBom, useBom } from '../features/boms/useBoms';
@@ -42,7 +43,12 @@ export default function BomFormPage() {
         queryKey: ['products', 'all'],
         queryFn: () => productsApi.list({ limit: 500 }),
     });
-    const products = productsData?.data || [];
+    const [extraProducts, setExtraProducts] = useState([]);
+    
+    const products = useMemo(() => {
+        const fetched = productsData?.data || [];
+        return [...fetched, ...extraProducts];
+    }, [productsData, extraProducts]);
 
     // Split products
     const finishedProducts = products.filter((p) =>
@@ -205,9 +211,19 @@ export default function BomFormPage() {
                                 </div>
                                 <Input label="Version" value={version} onChange={(e) => setVersion(e.target.value)} />
                             </div>
-                            <Select label="Finished Product" required placeholder="Select product to manufacture..."
-                                options={finishedOptions} value={finishedProductId}
-                                onChange={(e) => setFinishedProductId(e.target.value)} />
+                            <ProductAutocompleteSelect
+                                label="Finished Product *"
+                                placeholder="Type to search or add finished product..."
+                                products={finishedProducts}
+                                value={finishedProductId}
+                                productType="finished_good"
+                                onChange={(val, newProd) => {
+                                    if (newProd) {
+                                        setExtraProducts(prev => [...prev, newProd]);
+                                    }
+                                    setFinishedProductId(val);
+                                }}
+                            />
                             <div className="grid grid-cols-2 gap-4">
                                 <Input label="Output Quantity (per batch)" required type="number" step="0.01" min="0.01"
                                     value={outputQuantity} onChange={(e) => setOutputQuantity(e.target.value)} />
@@ -233,8 +249,18 @@ export default function BomFormPage() {
                                         <div className="flex gap-2 items-start mb-2">
                                             <span className="text-xs text-gray-500 mt-2 w-6">{idx + 1}</span>
                                             <div className="flex-1">
-                                                <Select placeholder="Select component..." options={componentOptions}
-                                                    value={c.productId} onChange={(e) => updateComponent(idx, 'productId', e.target.value)} />
+                                                <ProductAutocompleteSelect
+                                                    placeholder="Type to search or add component..."
+                                                    products={componentProducts}
+                                                    value={c.productId}
+                                                    productType="raw_material"
+                                                    onChange={(val, newProd) => {
+                                                        if (newProd) {
+                                                            setExtraProducts(prev => [...prev, newProd]);
+                                                        }
+                                                        updateComponent(idx, 'productId', val);
+                                                    }}
+                                                />
                                             </div>
                                             <button type="button" onClick={() => removeComponent(idx)}
                                                 className="text-red-600 hover:bg-red-50 p-2 rounded mt-1">

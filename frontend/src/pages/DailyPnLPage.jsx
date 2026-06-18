@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { format } from 'date-fns';
 import {
@@ -12,6 +13,7 @@ import DynamicForm from '../components/ui/DynamicForm';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 const DailyPnLPage = () => {
+    const queryClient = useQueryClient();
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -100,6 +102,10 @@ const DailyPnLPage = () => {
             }
             setIsModalOpen(false);
             fetchPnL();
+            queryClient.invalidateQueries({ queryKey: ['dashboardKpis'] });
+            queryClient.invalidateQueries({ queryKey: ['revenueChart'] });
+            queryClient.invalidateQueries({ queryKey: ['financialSnapshot'] });
+            queryClient.invalidateQueries({ queryKey: ['varianceReport'] });
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to save P&L record');
         } finally {
@@ -113,6 +119,10 @@ const DailyPnLPage = () => {
             toast.success('Record deleted');
             setDeleting(null);
             fetchPnL();
+            queryClient.invalidateQueries({ queryKey: ['dashboardKpis'] });
+            queryClient.invalidateQueries({ queryKey: ['revenueChart'] });
+            queryClient.invalidateQueries({ queryKey: ['financialSnapshot'] });
+            queryClient.invalidateQueries({ queryKey: ['varianceReport'] });
         } catch (err) { toast.error('Failed to delete'); }
     };
 

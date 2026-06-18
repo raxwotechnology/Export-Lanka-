@@ -18,7 +18,7 @@ const tabs = [
     { id: 'sales', label: 'Sales Config' },
 ];
 
-export default function ProductFormModal({ isOpen, onClose, product = null }) {
+export default function ProductFormModal({ isOpen, onClose, product = null, forceProductType = null }) {
     const [activeTab, setActiveTab] = useState('basic');
     const isEdit = !!product;
 
@@ -41,7 +41,7 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
             productCode: '',
             productShortCode: '',
             type: 'trading',
-            status: 'active',
+            status: 'inactive',
             taxable: true,
             taxRate: 18,
             sellable: true,
@@ -86,21 +86,27 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
                 notes: product.notes || '',
             });
         } else if (isOpen && !product) {
+            const rawCat = forceProductType === 'raw_material' && categoriesData?.data
+                ? categoriesData.data.find(c => c.code === 'RAW' || c.name === 'Raw Material')
+                : null;
+
             // Reset to defaults when creating new
             reset({
                 productCode: '',
                 productShortCode: '',
                 type: 'trading',
-                status: 'active',
+                status: 'inactive',
                 taxable: true,
                 taxRate: 18,
-                sellable: true,
+                sellable: forceProductType === 'raw_material' ? false : true,
                 allowBackorder: false,
                 minimumOrderQuantity: 1,
+                productType: forceProductType || 'finished_good',
+                categoryId: rawCat ? rawCat._id : '',
             });
         }
         setActiveTab('basic');
-    }, [isOpen, product, reset]);
+    }, [isOpen, product, reset, forceProductType, categoriesData]);
 
     const selectedCategoryId = watch('categoryId');
     const selectedProductShortCode = watch('productShortCode');
@@ -128,6 +134,10 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
     }, [selectedCategoryId, selectedProductShortCode, isEdit, isOpen, setValue]);
 
     const onSubmit = async (data) => {
+        const rawCat = forceProductType === 'raw_material' && categoriesData?.data
+            ? categoriesData.data.find(c => c.code === 'RAW' || c.name === 'Raw Material')
+            : null;
+
         // Transform flat form data back into nested structure for API
         const payload = {
             productCode: data.productCode || undefined,
@@ -136,12 +146,12 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
             shortName: data.shortName || undefined,
             sku: data.sku || undefined,
             barcode: data.barcode || undefined,
-            productType: data.productType,
-            canBeSold: data.canBeSold,
-            canBePurchased: data.canBePurchased,
+            productType: forceProductType || data.productType,
+            canBeSold: forceProductType === 'raw_material' ? false : data.canBeSold,
+            canBePurchased: forceProductType === 'raw_material' ? true : data.canBePurchased,
             canBeManufactured: data.canBeManufactured,
             description: data.description || undefined,
-            categoryId: data.categoryId,
+            categoryId: rawCat ? rawCat._id : data.categoryId,
             brandId: data.brandId || undefined,
             type: data.type,
             unitOfMeasure: data.unitOfMeasure,
@@ -163,10 +173,10 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
             },
             salesConfig: {
                 minimumOrderQuantity: data.minimumOrderQuantity || 1,
-                sellable: data.sellable,
+                sellable: forceProductType === 'raw_material' ? false : data.sellable,
                 allowBackorder: data.allowBackorder,
             },
-            status: data.status,
+            status: data.status || 'active',
             notes: data.notes || undefined,
         };
 
@@ -268,6 +278,7 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
                                 <Select
                                     label="Category"
                                     required
+                                    disabled={forceProductType === 'raw_material'}
                                     error={errors.categoryId?.message}
                                     options={categoryOptions}
                                     {...register('categoryId')}
@@ -280,6 +291,7 @@ export default function ProductFormModal({ isOpen, onClose, product = null }) {
                                 />
                                 <Select
                                     label="Product Type" required
+                                    disabled={forceProductType === 'raw_material'}
                                     options={[
                                         { value: 'finished_good', label: 'Finished Good (sellable)' },
                                         { value: 'raw_material', label: 'Raw Material (for production)' },

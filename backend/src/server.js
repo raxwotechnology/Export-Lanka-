@@ -34,6 +34,7 @@ import hrRoutes from './routes/hrRoutes.js';
 import payrollRoutes from './routes/payrollRoutes.js';
 import farmRoutes from './routes/farmRoutes.js';
 import farmHarvestRoutes from './routes/farmHarvestRoutes.js';
+import inventoryRecipeRoutes from './routes/inventoryRecipeRoutes.js';
 
 import reportsRoutes from './routes/reportsRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
@@ -143,6 +144,7 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/grns', grnRoutes);
 app.use('/api/farms', farmRoutes);
 app.use('/api/farm-harvests', farmHarvestRoutes);
+app.use('/api/inventory-recipes', inventoryRecipeRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/payments', paymentRoutes);

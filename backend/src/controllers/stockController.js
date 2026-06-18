@@ -16,6 +16,7 @@ export const getStockItems = asyncHandler(async (req, res) => {
     const {
         search, productId, warehouseId, lowStock,
         page = 1, limit = 50,
+        stockType,
     } = req.query;
 
     const filter = {};
@@ -28,10 +29,16 @@ export const getStockItems = asyncHandler(async (req, res) => {
         ];
     }
 
+    if (stockType === 'open') {
+        filter['quantities.openStock'] = { $gt: 0 };
+    } else if (stockType === 'balance') {
+        filter['quantities.balanceStock'] = { $gt: 0 };
+    }
+
     const skip = (Number(page) - 1) * Number(limit);
 
     let items = await StockItem.find(filter)
-        .populate('productId', 'name productCode sku stockLevels type')
+        .populate('productId', 'name productCode sku stockLevels type productType')
         .populate('warehouseId', 'name warehouseCode')
         .sort({ productName: 1 })
         .skip(skip)
@@ -337,7 +344,11 @@ export const convertStock = asyncHandler(async (req, res) => {
         warehouseId,
         inputQuantity,
         outputQuantity,
+        laborCost = 0,
+        overheadCost = 0,
         notes,
+        batchNumber = null,
+        openQuantity, // accept openQuantity
     } = req.body;
 
     if (!sourceProductId || !destinationProductId || !warehouseId || !inputQuantity || !outputQuantity) {
@@ -374,16 +385,23 @@ export const convertStock = asyncHandler(async (req, res) => {
                 notes,
                 userId: req.user._id,
                 session,
+                batchNumber: batchNumber || null,
             });
 
             // 2. Generate batch number & Increase destination product stock
-            const batchCode = generateJulianBatchCode('CONV');
+            const uniqueSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const batchCode = `${generateJulianBatchCode('CONV')}-${uniqueSuffix}`;
+
+            const sourceUnitCost = decResult.stockItem?.costPerUnit || sourceProduct.basePrice || 0;
+            const materialCost = sourceUnitCost * Number(inputQuantity);
+            const totalProductionCost = materialCost + Number(laborCost) + Number(overheadCost);
+            const destCostPerUnit = outputQuantity > 0 ? +(totalProductionCost / outputQuantity).toFixed(2) : 0;
 
             await increaseStock({
                 productId: destinationProductId,
                 warehouseId,
                 quantity: Number(outputQuantity),
-                costPerUnit: decResult.unitCost * (Number(inputQuantity) / Number(outputQuantity)),
+                costPerUnit: destCostPerUnit,
                 movementType: 'production_receipt',
                 batchNumber: batchCode,
                 sourceDocument: { type: 'stock_conversion', number: 'CONV' },
@@ -391,11 +409,13 @@ export const convertStock = asyncHandler(async (req, res) => {
                 notes,
                 userId: req.user._id,
                 session,
+                openQuantity: openQuantity !== undefined && openQuantity !== null ? Number(openQuantity) : undefined, // pass openQuantity
             });
 
             // 3. Automatically log a completed ProductionBatch
             const ProductionBatchModel = mongoose.model('ProductionBatch');
             const batchResult = await ProductionBatchModel.create([{
+                batchNo: batchCode,
                 date: new Date(),
                 supplierShortCode: 'CONV',
                 product: destProduct.name,
@@ -403,6 +423,9 @@ export const convertStock = asyncHandler(async (req, res) => {
                 warehouseId,
                 inputWeight_day: Number(inputQuantity),
                 outputWeight_day: Number(outputQuantity),
+                materialCost: Number(materialCost.toFixed(2)),
+                laborCost: Number(Number(laborCost).toFixed(2)),
+                overheadCost: Number(Number(overheadCost).toFixed(2)),
                 processingStage: 'completed',
                 qcStatus: 'approved',
                 status: 'completed',
@@ -431,4 +454,373 @@ export const convertStock = asyncHandler(async (req, res) => {
     } finally {
         session.endSession();
     }
+});
+
+/**
+ * POST /api/stock/convert-bom
+ * BOM-based stock conversion from Raw Materials to Finished Goods and logging Production Batch
+ */
+export const convertStockBom = asyncHandler(async (req, res) => {
+    const {
+        bomId,
+        warehouseId,
+        mainProductId,
+        inputQuantity,
+        notes,
+    } = req.body;
+
+    if (!bomId || !warehouseId || !mainProductId || !inputQuantity) {
+        res.status(400);
+        throw new Error('All fields (bomId, warehouseId, mainProductId, inputQuantity) are required');
+    }
+
+    const BillOfMaterials = mongoose.model('BillOfMaterials');
+    const Warehouse = mongoose.model('Warehouse');
+    const Product = mongoose.model('Product');
+
+    const bom = await BillOfMaterials.findById(bomId).populate('finishedProductId');
+    if (!bom) {
+        res.status(404);
+        throw new Error('BOM not found');
+    }
+
+    const warehouse = await Warehouse.findById(warehouseId);
+    if (!warehouse) {
+        res.status(404);
+        throw new Error('Warehouse not found');
+    }
+
+    const mainProduct = await Product.findById(mainProductId);
+    if (!mainProduct) {
+        res.status(404);
+        throw new Error('Main product not found');
+    }
+
+    // Find the main product inside the BOM components
+    const component = bom.components.find(c => c.productId && c.productId.toString() === mainProductId.toString());
+    if (!component) {
+        res.status(400);
+        throw new Error(`The selected product (${mainProduct.name}) is not a component of the selected BOM (${bom.name})`);
+    }
+
+    // Calculate batch multiplier based on main raw material
+    const multiplier = Number(inputQuantity) / component.quantity;
+    const outputQuantity = multiplier * bom.outputQuantity;
+
+    // Start mongoose transaction session
+    const session = await mongoose.startSession();
+    let productionBatch = null;
+
+    try {
+        await session.withTransaction(async () => {
+            let totalMaterialCost = 0;
+
+            // 1. Decrease stock for all components in the BOM
+            for (const comp of bom.components) {
+                if (!comp.productId) continue;
+
+                const reqQty = comp.quantity * multiplier;
+                const decResult = await decreaseStock({
+                    productId: comp.productId,
+                    warehouseId,
+                    quantity: reqQty,
+                    movementType: 'production_issue',
+                    sourceDocument: { type: 'stock_conversion', number: 'CONV-BOM' },
+                    reason: `Consumed in BOM conversion: ${bom.bomCode}`,
+                    notes,
+                    userId: req.user._id,
+                    session,
+                    allowNegative: warehouse.settings?.allowNegativeStock || false
+                });
+
+                const unitCost = decResult.stockItem?.costPerUnit || comp.standardCost || 0;
+                totalMaterialCost += unitCost * reqQty;
+            }
+
+            // 2. Generate unique batch code
+            const uniqueSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const finishedProductCode = bom.finishedProductCode || 'FIN';
+            const batchCode = `${generateJulianBatchCode(finishedProductCode)}-${uniqueSuffix}`;
+
+            // 3. Calculate destination cost per unit
+            const finalLaborCost = req.body.laborCost !== undefined ? Number(req.body.laborCost) : ((bom.totalLaborCost || 0) * multiplier);
+            const finalOverheadCost = req.body.overheadCost !== undefined ? Number(req.body.overheadCost) : ((bom.totalOverheadCost || 0) * multiplier);
+            const totalProductionCost = totalMaterialCost + finalLaborCost + finalOverheadCost;
+            const destCostPerUnit = outputQuantity > 0 ? +(totalProductionCost / outputQuantity).toFixed(2) : 0;
+
+            // 4. Increase stock for finished goods
+            await increaseStock({
+                productId: bom.finishedProductId._id,
+                warehouseId,
+                quantity: outputQuantity,
+                costPerUnit: destCostPerUnit,
+                movementType: 'production_receipt',
+                batchNumber: batchCode,
+                sourceDocument: { type: 'stock_conversion', number: 'CONV-BOM' },
+                reason: `Produced from BOM conversion: ${bom.bomCode}`,
+                notes,
+                userId: req.user._id,
+                session,
+            });
+
+            // 5. Create completed ProductionBatch
+            const ProductionBatchModel = mongoose.model('ProductionBatch');
+            const batchResult = await ProductionBatchModel.create([{
+                batchNo: batchCode,
+                date: new Date(),
+                supplierShortCode: 'CONV',
+                product: bom.finishedProductName,
+                productId: bom.finishedProductId._id,
+                warehouseId,
+                inputWeight_day: Number(inputQuantity),
+                outputWeight_day: Number(outputQuantity),
+                materialCost: Number(totalMaterialCost.toFixed(2)),
+                laborCost: Number(finalLaborCost.toFixed(2)),
+                overheadCost: Number(finalOverheadCost.toFixed(2)),
+                processingStage: 'completed',
+                qcStatus: 'approved',
+                status: 'completed',
+                remark: notes || `BOM conversion using ${bom.bomCode} (${bom.name}) with ${inputQuantity} ${component.unitOfMeasure || 'kg'} of ${component.productName}`,
+                createdBy: req.user._id,
+                updatedBy: req.user._id,
+            }], { session });
+            
+            productionBatch = batchResult[0];
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Stock converted using BOM successfully and production batch logged',
+            data: {
+                bomId,
+                warehouseId,
+                mainProductId,
+                inputQuantity,
+                outputQuantity,
+                productionBatch
+            }
+        });
+    } catch (error) {
+        res.status(400);
+        throw new Error(error.message || 'BOM-based stock conversion failed');
+    } finally {
+        session.endSession();
+    }
+});
+
+/**
+ * POST /api/stock/convert-recipe
+ * Conversion using a simple Inventory Recipe (1-to-1 crop-to-finished-good)
+ */
+export const convertStockRecipe = asyncHandler(async (req, res) => {
+    const {
+        recipeId,
+        warehouseId,
+        inputQuantity,
+        laborCost = 0,
+        overheadCost = 0,
+        notes,
+        batchNumber = null,
+        openQuantity, // accept openQuantity
+    } = req.body;
+
+    if (!recipeId || !warehouseId || !inputQuantity) {
+        res.status(400);
+        throw new Error('All fields (recipeId, warehouseId, inputQuantity) are required');
+    }
+
+    const InventoryRecipe = mongoose.model('InventoryRecipe');
+    const Product = mongoose.model('Product');
+    const Warehouse = mongoose.model('Warehouse');
+
+    const recipe = await InventoryRecipe.findById(recipeId)
+        .populate('sourceProductId')
+        .populate('destinationProductId');
+
+    if (!recipe) {
+        res.status(404);
+        throw new Error('Inventory Recipe not found');
+    }
+
+    const warehouse = await Warehouse.findById(warehouseId);
+    if (!warehouse) {
+        res.status(404);
+        throw new Error('Warehouse not found');
+    }
+
+    const sourceProduct = recipe.sourceProductId;
+    const destProduct = recipe.destinationProductId;
+
+    // Calculate yield output quantity based on recipe ratio
+    const multiplier = Number(inputQuantity) / recipe.inputQuantity;
+    const outputQuantity = multiplier * recipe.outputQuantity;
+
+    const session = await mongoose.startSession();
+    let productionBatch = null;
+
+    try {
+        await session.withTransaction(async () => {
+            // 1. Decrease source product stock
+            const decResult = await decreaseStock({
+                productId: sourceProduct._id,
+                warehouseId,
+                quantity: Number(inputQuantity),
+                movementType: 'production_issue',
+                sourceDocument: { type: 'stock_conversion', number: 'CONV-RECIPE' },
+                reason: `Consumed in Recipe: ${recipe.recipeCode} (${recipe.name})`,
+                notes,
+                userId: req.user._id,
+                session,
+                allowNegative: warehouse.settings?.allowNegativeStock || false,
+                batchNumber: batchNumber || null,
+            });
+
+            const sourceUnitCost = decResult.stockItem?.costPerUnit || sourceProduct.basePrice || 0;
+            const materialCost = sourceUnitCost * Number(inputQuantity);
+            const totalProductionCost = materialCost + Number(laborCost) + Number(overheadCost);
+            const destCostPerUnit = outputQuantity > 0 ? +(totalProductionCost / outputQuantity).toFixed(2) : 0;
+
+            // 2. Generate batch number
+            const uniqueSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const finishedProductCode = destProduct.productCode || 'FIN';
+            const batchCode = `${generateJulianBatchCode(finishedProductCode)}-${uniqueSuffix}`;
+
+            // 3. Increase destination product stock
+            await increaseStock({
+                productId: destProduct._id,
+                warehouseId,
+                quantity: outputQuantity,
+                costPerUnit: destCostPerUnit,
+                movementType: 'production_receipt',
+                batchNumber: batchCode,
+                sourceDocument: { type: 'stock_conversion', number: 'CONV-RECIPE' },
+                reason: `Produced from Recipe: ${recipe.recipeCode} (${recipe.name})`,
+                notes,
+                userId: req.user._id,
+                session,
+                openQuantity: openQuantity !== undefined && openQuantity !== null ? Number(openQuantity) : undefined, // pass openQuantity
+            });
+
+            // 4. Log ProductionBatch with costing details
+            const ProductionBatchModel = mongoose.model('ProductionBatch');
+            const batchResult = await ProductionBatchModel.create([{
+                batchNo: batchCode,
+                date: new Date(),
+                supplierShortCode: 'CONV',
+                product: destProduct.name,
+                productId: destProduct._id,
+                warehouseId,
+                inputWeight_day: Number(inputQuantity),
+                outputWeight_day: Number(outputQuantity),
+                materialCost: Number(materialCost.toFixed(2)),
+                laborCost: Number(Number(laborCost).toFixed(2)),
+                overheadCost: Number(Number(overheadCost).toFixed(2)),
+                processingStage: 'completed',
+                qcStatus: 'approved',
+                status: 'completed',
+                remark: notes || `Recipe conversion using ${recipe.recipeCode} (${recipe.name}) with ${inputQuantity} ${sourceProduct.unitOfMeasure || 'kg'} of ${sourceProduct.name}`,
+                createdBy: req.user._id,
+                updatedBy: req.user._id,
+            }], { session });
+
+            productionBatch = batchResult[0];
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Stock converted using recipe successfully and production batch logged',
+            data: {
+                recipeId,
+                warehouseId,
+                inputQuantity,
+                outputQuantity,
+                productionBatch
+            }
+        });
+    } catch (error) {
+        res.status(400);
+        throw new Error(error.message || 'Recipe conversion failed');
+    } finally {
+        session.endSession();
+    }
+});
+
+/**
+ * POST /api/stock/release
+ * Release a quantity from balanceStock to openStock
+ */
+export const releaseStock = asyncHandler(async (req, res) => {
+    const { productId, warehouseId, batchNumber = null, quantity, notes } = req.body;
+
+    if (!productId || !warehouseId || !quantity || Number(quantity) <= 0) {
+        res.status(400);
+        throw new Error('productId, warehouseId and a positive quantity are required');
+    }
+
+    const StockItem = mongoose.model('StockItem');
+    const StockMovement = mongoose.model('StockMovement');
+    const Product = mongoose.model('Product');
+
+    const product = await Product.findById(productId);
+    if (!product) {
+        res.status(404);
+        throw new Error('Product not found');
+    }
+
+    const stockItem = await StockItem.findOne({ productId, warehouseId, batchNumber });
+    if (!stockItem) {
+        res.status(404);
+        throw new Error('Stock item record not found in the selected warehouse');
+    }
+
+    const balanceStock = stockItem.quantities.balanceStock || 0;
+    if (balanceStock < Number(quantity)) {
+        res.status(400);
+        throw new Error(`Insufficient balance stock. Available balance stock: ${balanceStock}, requested: ${quantity}`);
+    }
+
+    const balanceBefore = stockItem.quantities.onHand;
+
+    // Shift quantity from balanceStock to openStock
+    stockItem.quantities.balanceStock = balanceStock - Number(quantity);
+    stockItem.quantities.openStock = (stockItem.quantities.openStock || 0) + Number(quantity);
+    stockItem.quantities.onHand = stockItem.quantities.openStock + stockItem.quantities.balanceStock;
+    stockItem.lastMovementDate = new Date();
+
+    await stockItem.save();
+
+    // Log a stock release movement
+    const movement = new StockMovement({
+        productId,
+        productCode: product.productCode,
+        productName: product.name,
+        batchNumber,
+        movementType: 'stock_release',
+        direction: 'internal',
+        quantity: Number(quantity),
+        unitOfMeasure: product.unitOfMeasure,
+        warehouseId,
+        costPerUnit: stockItem.costPerUnit,
+        totalCost: +(Number(quantity) * stockItem.costPerUnit).toFixed(2),
+        balanceBefore,
+        balanceAfter: stockItem.quantities.onHand,
+        sourceDocument: { type: 'stock_release', number: 'RELEASE' },
+        reason: 'Released from balance to open stock',
+        notes: notes || '',
+        performedBy: req.user._id,
+    });
+    await movement.save();
+
+    res.status(200).json({
+        success: true,
+        message: 'Stock released from balance to open stock successfully',
+        data: {
+            productId,
+            warehouseId,
+            batchNumber,
+            quantity: Number(quantity),
+            stockItem,
+            movement
+        }
+    });
 });

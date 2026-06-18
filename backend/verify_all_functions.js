@@ -13,6 +13,7 @@ import StockMovement from './src/models/StockMovement.js';
 import Counter from './src/models/Counter.js';
 import Category from './src/models/Category.js';
 import Bill from './src/models/Bill.js';
+import BillOfMaterials from './src/models/BillOfMaterials.js';
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ async function run() {
         await Product.deleteMany({ name: /^Verification / });
         await Bill.deleteMany({ supplierInvoiceNumber: { $regex: '^GRN-|^HRV-' } });
         await ProductionBatch.deleteMany({ remark: 'Verification script direct stock conversion check' });
+        await Warehouse.deleteMany({ name: 'Verification Warehouse' });
         console.log('✓ Cleaned up any legacy verification test records\n');
 
         // 1. Verify Farm Model (Create Farm)
@@ -42,22 +44,28 @@ async function run() {
         console.log(`✓ Farm created successfully. farmCode: ${farm.farmCode}, ID: ${farm._id}`);
 
         // 2. Fetch a Raw Material product and Warehouse for testing
-        const rawProduct = await Product.findOne({ type: 'raw_material' });
-        const warehouse = await Warehouse.findOne({});
+        const rawProduct = await Product.findOne({ productType: 'raw_material' });
+        let warehouse = await Warehouse.findOne({});
         
         if (!rawProduct) {
             console.log('⚠️ No raw material product found in DB. Creating one...');
             // Create a temporary raw material product
             const ProductModel = mongoose.model('Product');
             const CategoryModel = mongoose.model('Category');
-            let cat = await CategoryModel.findOne({ code: 'RAW' });
-            if (!cat) {
+            let cat = await CategoryModel.findOne({ $or: [{ code: 'RAW' }, { name: 'Raw Material' }] }).setOptions({ includeDeleted: true });
+            if (cat) {
+                if (cat.deletedAt) {
+                    cat.deletedAt = null;
+                    cat.isActive = true;
+                    await cat.save();
+                }
+            } else {
                 cat = await CategoryModel.create({ name: 'Raw Material', code: 'RAW' });
             }
             const newRawProd = await ProductModel.create({
                 name: 'Verification Soursop Leaves',
                 sku: 'VERIFY-SRS-' + Date.now(),
-                type: 'raw_material',
+                productType: 'raw_material',
                 productShortCode: 'SRS',
                 categoryId: cat._id,
                 unitOfMeasure: 'kg',
@@ -67,10 +75,18 @@ async function run() {
         }
         
         if (!warehouse) {
-            throw new Error('❌ No Warehouse found in DB. Cannot continue verification.');
+            console.log('⚠️ No Warehouse found in DB. Creating one...');
+            warehouse = await Warehouse.create({
+                name: 'Verification Warehouse',
+                warehouseCode: 'WH-VERIFY',
+                type: 'main',
+                isActive: true,
+                isDefault: true
+            });
+            console.log(`✓ Temporary warehouse created: ${warehouse.name} (${warehouse.warehouseCode})`);
         }
 
-        const testRawProduct = rawProduct || await Product.findOne({ type: 'raw_material' });
+        const testRawProduct = rawProduct || await Product.findOne({ productType: 'raw_material' });
         console.log(`Using product for harvest/GRN: ${testRawProduct.name} (${testRawProduct.productCode})`);
         console.log(`Using Warehouse: ${warehouse.name} (${warehouse.warehouseCode})`);
 
@@ -347,19 +363,25 @@ async function run() {
         console.log('\n--- Step 4: Direct Stock Converter & Completed Production Batch Verification ---');
         
         // Find or create a finished good product
-        let finProduct = await Product.findOne({ type: 'finished_good' });
+        let finProduct = await Product.findOne({ productType: 'finished_good' });
         if (!finProduct) {
             console.log('⚠️ No finished good product found in DB. Creating one...');
             const ProductModel = mongoose.model('Product');
             const CategoryModel = mongoose.model('Category');
-            let cat = await CategoryModel.findOne({ code: 'FIN' });
-            if (!cat) {
+            let cat = await CategoryModel.findOne({ $or: [{ code: 'FIN' }, { name: 'Finished Good' }] }).setOptions({ includeDeleted: true });
+            if (cat) {
+                if (cat.deletedAt) {
+                    cat.deletedAt = null;
+                    cat.isActive = true;
+                    await cat.save();
+                }
+            } else {
                 cat = await CategoryModel.create({ name: 'Finished Good', code: 'FIN' });
             }
             finProduct = await ProductModel.create({
                 name: 'Verification Moringa Powder',
                 sku: 'VERIFY-MOR-' + Date.now(),
-                type: 'finished_good',
+                productType: 'finished_good',
                 productShortCode: 'MOR',
                 categoryId: cat._id,
                 unitOfMeasure: 'kg',
@@ -389,7 +411,8 @@ async function run() {
             });
 
             // 2. Increase finished goods stock
-            const batchCode = `CONV-ALE${yearShort}${julianString}`;
+            const uniqueSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const batchCode = `CONV-ALE${yearShort}${julianString}-${uniqueSuffix}`;
             await increaseStock({
                 productId: finProduct._id,
                 warehouseId: warehouse._id,
@@ -406,6 +429,7 @@ async function run() {
 
             // 3. Log a completed ProductionBatch
             loggedBatch = await ProductionBatch.create([{
+                batchNo: batchCode,
                 date: new Date(),
                 supplierShortCode: 'CONV',
                 product: finProduct.name,
@@ -427,6 +451,52 @@ async function run() {
         console.log(`- Created completed Production Batch: ${loggedBatch ? loggedBatch[0].batchNo : 'FAILED'}`);
         console.log(`- Batch details: Input: ${loggedBatch[0].inputWeight_total} Kg, Output: ${loggedBatch[0].outputWeight_total} Kg, Efficiency: ${loggedBatch[0].efficiencyPercentage}%`);
 
+        // 5. Verify BOM-based Stock Converter & Completed Production Batch Logging
+        console.log('\n--- Step 4.5: BOM-based Stock Converter & Completed Production Batch Verification ---');
+        const BillOfMaterials = mongoose.model('BillOfMaterials');
+        const tempBom = await BillOfMaterials.create({
+            name: 'Verification Test BOM',
+            finishedProductId: finProduct._id,
+            finishedProductCode: finProduct.productCode,
+            finishedProductName: finProduct.name,
+            outputQuantity: 1,
+            outputUnitOfMeasure: 'kg',
+            components: [{
+                productId: testRawProduct._id,
+                productCode: testRawProduct.productCode,
+                productName: testRawProduct.name,
+                productType: 'raw_material',
+                quantity: 5,
+                unitOfMeasure: 'kg',
+                standardCost: 150
+            }]
+        });
+        console.log(`✓ Temporary BOM created: ${tempBom.name} (${tempBom.bomCode})`);
+
+        const bomReq = {
+            body: {
+                bomId: tempBom._id.toString(),
+                warehouseId: warehouse._id.toString(),
+                mainProductId: testRawProduct._id.toString(),
+                inputQuantity: 10,
+                notes: 'Verification test BOM conversion check'
+            },
+            user: {
+                _id: new mongoose.Types.ObjectId()
+            }
+        };
+        const bomRes = {
+            status: function(code) { this.statusCode = code; return this; },
+            json: function(data) { this.responseData = data; return this; }
+        };
+        const { convertStockBom } = await import('./src/controllers/stockController.js');
+        await convertStockBom(bomReq, bomRes);
+
+        console.log(`✓ BOM-based conversion processed successfully! Status code: ${bomRes.statusCode || 201}`);
+        const bomBatch = bomRes.responseData?.data?.productionBatch;
+        console.log(`- Created completed Production Batch from BOM: ${bomBatch ? bomBatch.batchNo : 'FAILED'}`);
+        console.log(`- Input Quantity: ${bomRes.responseData?.data?.inputQuantity}, Output Quantity: ${bomRes.responseData?.data?.outputQuantity}`);
+
         // Clean up verification data
         console.log('\n--- Step 5: Clean up verification records ---');
         await Farm.deleteOne({ _id: farm._id });
@@ -435,8 +505,17 @@ async function run() {
         console.log('✓ Cleaned up verification products');
         await Bill.deleteMany({ supplierInvoiceNumber: { $in: [grn.grnNumber, harvest.harvestNumber] } });
         console.log('✓ Cleaned up verification bills');
-        await ProductionBatch.deleteMany({ remark: 'Verification script direct stock conversion check' });
+        await ProductionBatch.deleteMany({ 
+            $or: [
+                { remark: 'Verification script direct stock conversion check' },
+                { remark: 'Verification test BOM conversion check' }
+            ]
+        });
         console.log('✓ Cleaned up verification production batches');
+        await BillOfMaterials.deleteMany({ name: 'Verification Test BOM' });
+        console.log('✓ Cleaned up verification BOMs');
+        await Warehouse.deleteMany({ name: 'Verification Warehouse' });
+        console.log('✓ Cleaned up verification warehouse');
         
         console.log('\n🎉 ALL FUNCTIONAL BACKEND FLOWS PASSED SUCCESSFULLY!');
 

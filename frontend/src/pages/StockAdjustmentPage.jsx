@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Plus, Trash2, ArrowLeft, Save, Settings2 } from 'lucide-react';
@@ -44,11 +44,33 @@ export default function StockAdjustmentPage() {
         value: w._id, label: `${w.name} (${w.warehouseCode})`,
     }));
 
-    const productOptions = (stockData?.data || []).map((s) => ({
-        value: s.productId._id,
-        label: `${s.productName} — On hand: ${s.quantities.onHand}`,
-        onHand: s.quantities.onHand,
-    }));
+    const productOptions = useMemo(() => {
+        const rawStock = stockData?.data || [];
+        const productMap = {};
+
+        rawStock.forEach((s) => {
+            if (!s.productId) return;
+            const pId = s.productId._id;
+            const onHand = s.quantities.onHand || 0;
+
+            if (!productMap[pId]) {
+                productMap[pId] = {
+                    value: pId,
+                    label: s.productName,
+                    productName: s.productName,
+                    productCode: s.productId.productCode || '—',
+                    onHand: 0,
+                };
+            }
+            productMap[pId].onHand += onHand;
+        });
+
+        return Object.values(productMap).map((p) => ({
+            value: p.value,
+            label: `${p.productName} (${p.productCode}) — On hand: ${p.onHand.toFixed(2)}`,
+            onHand: p.onHand,
+        }));
+    }, [stockData]);
 
     const addLine = () => setLines([...lines, { productId: '', adjustmentQuantity: '', reason: 'physical_count' }]);
     const removeLine = (idx) => setLines(lines.filter((_, i) => i !== idx));

@@ -137,8 +137,7 @@ const productSchema = new mongoose.Schema(
 
         status: {
             type: String,
-            type: String,
-            default: 'active',
+            default: 'inactive',
         },
 
         notes: { type: String, trim: true, maxlength: 1000 },

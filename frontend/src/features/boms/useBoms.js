@@ -54,4 +54,6 @@ export const useCheckAvailability = (bomId, quantity) => useQuery({
     queryKey: ['bomAvailability', bomId, quantity],
     queryFn: () => bomsApi.checkAvailability(bomId, quantity),
     enabled: !!bomId && !!quantity,
+    staleTime: 0,             // Always treat as stale — stock changes constantly
+    refetchOnMount: 'always', // Always refetch when component mounts
 });

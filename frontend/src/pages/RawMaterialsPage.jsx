@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { Search, Boxes, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Search, Boxes, AlertTriangle, RefreshCw, Plus } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Table from '../components/ui/Table';
 import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
+import Button from '../components/ui/Button';
+import ProductFormModal from '../features/products/ProductFormModal';
 
 export default function RawMaterialsPage() {
     const [stockItems, setStockItems] = useState([]);
     const [warehouses, setWarehouses] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isFormOpen, setIsFormOpen] = useState(false);
 
     const [search, setSearch] = useState('');
     const [warehouseFilter, setWarehouseFilter] = useState('');
@@ -27,7 +30,7 @@ export default function RawMaterialsPage() {
             
             // Filter only raw materials
             const rawItems = (stockRes.data.data || []).filter(item => {
-                return item.productId?.type === 'raw_material';
+                return item.productId?.productType === 'raw_material';
             });
 
             setStockItems(rawItems);
@@ -137,6 +140,12 @@ export default function RawMaterialsPage() {
             <PageHeader
                 title="Raw Materials Inventory"
                 description="Monitor stocks, values, and batches of raw agricultural products"
+                actions={
+                    <Button variant="primary" onClick={() => setIsFormOpen(true)}>
+                        <Plus size={16} className="mr-1.5" />
+                        Add Raw Material
+                    </Button>
+                }
             />
 
             {/* Stats strip */}
@@ -216,6 +225,15 @@ export default function RawMaterialsPage() {
                     <Table columns={columns} data={filteredItems} />
                 )}
             </Card>
+
+            <ProductFormModal
+                isOpen={isFormOpen}
+                onClose={() => {
+                    setIsFormOpen(false);
+                    fetchAllData();
+                }}
+                forceProductType="raw_material"
+            />
         </div>
     );
 }

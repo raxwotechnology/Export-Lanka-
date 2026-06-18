@@ -42,11 +42,15 @@ export const useShiftWiseReport = (params = {}) => useQuery({ queryKey: ['shiftW
 export const useDashboardKpis = () => useQuery({
     queryKey: ['dashboardKpis'],
     queryFn: dashboardApi.kpis,
-    refetchInterval: 60000, // refresh every minute
+    refetchInterval: 60000,      // auto-refresh every minute
+    refetchOnMount: 'always',    // always fetch fresh on mount
+    staleTime: 0,                // never serve stale dashboard data
 });
 export const useRevenueChart = (months = 6) => useQuery({
     queryKey: ['revenueChart', months],
     queryFn: () => dashboardApi.revenueChart(months),
+    refetchOnMount: 'always',
+    staleTime: 0,
 });
 export const useTopProducts = (params = {}) => useQuery({
     queryKey: ['topProducts', params],

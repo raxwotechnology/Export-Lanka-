@@ -2,6 +2,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { invoicesApi } from './invoicesApi';
 
+const invalidateReportsAndDashboard = (qc) => {
+    const keys = [
+        'dashboardKpis', 'revenueChart', 'topProducts', 'topCustomers',
+        'stockValuation', 'stockMovementReport', 'lowStockReport', 'dailyStockStatus',
+        'salesSummary', 'salesByProduct', 'salesByCustomer', 'salesTrend',
+        'financialSnapshot', 'varianceReport'
+    ];
+    keys.forEach(key => qc.invalidateQueries({ queryKey: [key] }));
+};
+
 export const useInvoices = (filters = {}) => useQuery({
     queryKey: ['invoices', filters],
     queryFn: () => invoicesApi.list(filters),
@@ -21,6 +31,9 @@ export const useCreateInvoice = () => {
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['invoices'] });
             qc.invalidateQueries({ queryKey: ['customers'] });
+            qc.invalidateQueries({ queryKey: ['stock'] });
+            qc.invalidateQueries({ queryKey: ['stockMovements'] });
+            invalidateReportsAndDashboard(qc);
             toast.success('Invoice created');
         },
         onError: (err) => toast.error(err.response?.data?.message || 'Failed'),
@@ -35,6 +48,9 @@ export const useGenerateFromSO = () => {
             qc.invalidateQueries({ queryKey: ['invoices'] });
             qc.invalidateQueries({ queryKey: ['salesOrders'] });
             qc.invalidateQueries({ queryKey: ['customers'] });
+            qc.invalidateQueries({ queryKey: ['stock'] });
+            qc.invalidateQueries({ queryKey: ['stockMovements'] });
+            invalidateReportsAndDashboard(qc);
             toast.success('Invoice generated from sales order');
         },
         onError: (err) => toast.error(err.response?.data?.message || 'Failed'),
@@ -48,6 +64,8 @@ export const useChangeInvoiceStatus = () => {
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['invoices'] });
             qc.invalidateQueries({ queryKey: ['invoice'] });
+            qc.invalidateQueries({ queryKey: ['customers'] });
+            invalidateReportsAndDashboard(qc);
             toast.success('Status updated');
         },
         onError: (err) => toast.error(err.response?.data?.message || 'Failed'),

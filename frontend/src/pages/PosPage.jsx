@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Search, Plus, Minus, Trash2, ShoppingCart, Save, X,
     Package, UserPlus, CreditCard,
@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import Badge from '../components/ui/Badge';
+import CustomerAutocompleteSelect from '../components/ui/CustomerAutocompleteSelect';
 import { customersApi } from '../features/customers/customersApi';
 import { productsApi } from '../features/products/productsApi';
 import { stockApi } from '../features/stock/stockApi';
@@ -19,10 +20,12 @@ import { useWarehouses } from '../features/warehouses/useWarehouses';
 import { useCategories } from '../features/products/useProducts';
 import { useCreateSalesOrder } from '../features/salesOrders/useSalesOrders';
 import QuickCreateCustomerModal from '../features/customers/QuickCreateCustomerModal';
+import api from '../api/axios';
 
 export default function PosPage() {
     const navigate = useNavigate();
     const createOrder = useCreateSalesOrder();
+    const queryClient = useQueryClient();
 
     // Cart state
     const [customerId, setCustomerId] = useState('');
@@ -37,6 +40,15 @@ export default function PosPage() {
     const [overrideTaxRate, setOverrideTaxRate] = useState(18);
     const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
 
+    // Payment states
+    const [paymentMethod, setPaymentMethod] = useState('cash');
+    const [bankAccountId, setBankAccountId] = useState('');
+    const [paymentReference, setPaymentReference] = useState('');
+    const [chequeNumber, setChequeNumber] = useState('');
+    const [chequeDate, setChequeDate] = useState('');
+    const [bankName, setBankName] = useState('');
+    const [chequeStatus, setChequeStatus] = useState('pending');
+
     const cartDrawerRef = useRef(null);
     const searchRef = useRef(null);
 
@@ -45,29 +57,57 @@ export default function PosPage() {
     const { data: customersData } = useQuery({
         queryKey: ['customers', 'active'],
         queryFn: () => customersApi.list({ status: 'active', limit: 500 }),
+        staleTime: 0,
     });
     const { data: productsData } = useQuery({
         queryKey: ['products', 'active', 'pos'],
         queryFn: () => productsApi.list({ status: 'active', canBeSold: true, limit: 500 }),
+        staleTime: 0,
     });
     const { data: categoriesData } = useCategories({ isActive: 'true' });
     const { data: stockData } = useQuery({
         queryKey: ['stock', 'pos', sourceWarehouseId],
         queryFn: () => stockApi.list({ warehouseId: sourceWarehouseId, limit: 500 }),
         enabled: !!sourceWarehouseId,
+        staleTime: 0,
     });
+    const { data: bankAccountsData } = useQuery({
+        queryKey: ['bankAccounts'],
+        queryFn: async () => {
+            const { data } = await api.get('/finance/bank-accounts');
+            return data.data || [];
+        },
+        staleTime: 60000,
+    });
+    const bankAccounts = bankAccountsData || [];
 
+    // Set default bank account
+    useEffect(() => {
+        if (!bankAccountId && bankAccounts.length > 0) {
+            const def = bankAccounts.find((a) => a.isActive) || bankAccounts[0];
+            if (def) setBankAccountId(def._id);
+        }
+    }, [bankAccounts, bankAccountId]);
     const warehouses = warehousesData?.data || [];
     const customers = customersData?.data || [];
-    const products = (productsData?.data || []).filter((p) => p.canBeSold !== false);
+    const activeWarehouse = warehouses.find((w) => w._id === sourceWarehouseId);
+    const allowNegative = activeWarehouse?.settings?.allowNegativeStock || false;
+
+    // Only show sellable, non-raw-material products in POS
+    const NON_SELLABLE_TYPES = ['raw_material', 'packaging', 'consumable', 'service'];
+    const products = (productsData?.data || []).filter(
+        (p) => p.canBeSold !== false && !NON_SELLABLE_TYPES.includes(p.productType)
+    );
     const categories = categoriesData?.data || [];
     const stockItems = stockData?.data || [];
 
     // Set default warehouse
     useEffect(() => {
         if (!sourceWarehouseId && warehouses.length > 0) {
-            const def = warehouses.find((w) => w.isDefault) || warehouses[0];
-            if (def) setSourceWarehouseId(def._id);
+            const mainWh = warehouses.find((w) => w.name?.toLowerCase().includes('main'))
+                || warehouses.find((w) => w.isDefault)
+                || warehouses[0];
+            if (mainWh) setSourceWarehouseId(mainWh._id);
         }
     }, [warehouses, sourceWarehouseId]);
 
@@ -88,8 +128,8 @@ export default function PosPage() {
         const map = new Map();
         stockItems.forEach((s) => {
             const pid = s.productId?._id || s.productId;
-            const existing = map.get(pid) || { onHand: 0, reserved: 0 };
-            existing.onHand += s.quantities?.onHand || 0;
+            const existing = map.get(pid) || { openStock: 0, reserved: 0 };
+            existing.openStock += s.quantities?.openStock || 0;
             existing.reserved += s.quantities?.reserved || 0;
             map.set(pid, existing);
         });
@@ -122,9 +162,9 @@ export default function PosPage() {
     // Cart actions
     const addToCart = (product) => {
         const stock = stockMap.get(product._id);
-        const available = stock ? Math.max(0, stock.onHand - stock.reserved) : 0;
+        const available = stock ? Math.max(0, stock.openStock - stock.reserved) : 0;
 
-        if (available <= 0) {
+        if (!allowNegative && available <= 0) {
             toast.error(`${product.name} is out of stock`);
             return;
         }
@@ -132,7 +172,7 @@ export default function PosPage() {
         setCart((prev) => {
             const existing = prev.find((i) => i.productId === product._id);
             if (existing) {
-                if (existing.qty >= available) {
+                if (!allowNegative && existing.qty >= available) {
                     toast.error(`Only ${available} available`);
                     return prev;
                 }
@@ -140,7 +180,7 @@ export default function PosPage() {
                     ? { ...i, qty: i.qty + 1 } : i);
             }
 
-            let price = product.basePrice;
+            let price = product.basePrice || product.costs?.lastPurchaseCost || product.costs?.averageCost || 0;
             if (selectedCustomer?.defaultDiscountPercent) {
                 price = price * (1 - selectedCustomer.defaultDiscountPercent / 100);
             }
@@ -164,7 +204,7 @@ export default function PosPage() {
             if (i.productId !== productId) return i;
             const newQty = i.qty + delta;
             if (newQty <= 0) return null;
-            if (newQty > i.available) {
+            if (!allowNegative && newQty > i.available) {
                 toast.error(`Only ${i.available} available`);
                 return i;
             }
@@ -176,7 +216,7 @@ export default function PosPage() {
         setCart((prev) => prev.map((i) => {
             if (i.productId !== productId) return i;
             const newQty = Math.max(0, +qty || 0);
-            if (newQty > i.available) {
+            if (!allowNegative && newQty > i.available) {
                 toast.error(`Only ${i.available} available`);
                 return i;
             }
@@ -219,13 +259,63 @@ export default function PosPage() {
 
     const fmt = (n) => new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 }).format(n || 0);
 
+    const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
+
     const handleCheckout = async (saveAsDraft = false) => {
-        if (!customerId) { toast.error('Select a customer'); return; }
+        if (!customerId || !customerId.trim()) { toast.error('Select a customer'); return; }
         if (!sourceWarehouseId) { toast.error('Select a warehouse'); return; }
         if (cart.length === 0) { toast.error('Cart is empty'); return; }
 
+        let activeCustomerId = customerId;
+        if (!isValidObjectId(customerId)) {
+            // Check if there is an exact case-insensitive match in customers list
+            const exactMatch = customers.find(
+                (c) => c.displayName?.toLowerCase() === customerId.trim().toLowerCase()
+            );
+            if (exactMatch) {
+                activeCustomerId = exactMatch._id;
+            } else {
+                // New name, auto-create it
+                try {
+                    const payload = {
+                        displayName: customerId.trim(),
+                        legalName: customerId.trim(),
+                        status: 'active',
+                        paymentTerms: {
+                            type: 'cod',
+                            creditDays: 0,
+                            creditLimit: 0,
+                        },
+                    };
+                    const res = await api.post('/customers', payload);
+                    if (res.data?.success && res.data?.data) {
+                        const newCust = res.data.data;
+                        toast.success(`Created customer: ${newCust.displayName}`);
+                        activeCustomerId = newCust._id;
+                        queryClient.invalidateQueries({ queryKey: ['customers'] });
+                    } else {
+                        toast.error('Failed to auto-create customer');
+                        return;
+                    }
+                } catch (err) {
+                    console.error('Customer auto-creation failed during checkout:', err);
+                    toast.error(err.response?.data?.message || 'Failed to auto-create new customer');
+                    return;
+                }
+            }
+        }
+
+        if (!saveAsDraft) {
+            if (paymentMethod !== 'cash' && !bankAccountId) { toast.error('Select Bank/Cash Account'); return; }
+            if (paymentMethod === 'cheque') {
+                if (!chequeNumber) { toast.error('Enter Cheque Number'); return; }
+                if (!chequeDate) { toast.error('Select Cheque Date'); return; }
+                if (!bankName) { toast.error('Enter Bank Name'); return; }
+            }
+        }
+
         const payload = {
-            customerId,
+            customerId: activeCustomerId,
             sourceWarehouseId,
             source: 'pos',
             items: cart.map((i) => ({
@@ -240,6 +330,13 @@ export default function PosPage() {
                 ? { type: 'percentage', value: +orderDiscountPercent }
                 : undefined,
             status: saveAsDraft ? 'draft' : 'approved',
+            paymentMethod: saveAsDraft ? undefined : paymentMethod,
+            bankAccountId: (saveAsDraft || paymentMethod === 'cash') ? undefined : bankAccountId,
+            paymentReference: saveAsDraft ? undefined : (paymentMethod === 'card' || paymentMethod === 'bank_transfer') ? paymentReference : undefined,
+            chequeNumber: saveAsDraft ? undefined : paymentMethod === 'cheque' ? chequeNumber : undefined,
+            chequeDate: saveAsDraft ? undefined : paymentMethod === 'cheque' ? chequeDate : undefined,
+            bankName: saveAsDraft ? undefined : paymentMethod === 'cheque' ? bankName : undefined,
+            chequeStatus: saveAsDraft ? undefined : paymentMethod === 'cheque' ? chequeStatus : undefined,
         };
 
         try {
@@ -253,6 +350,7 @@ export default function PosPage() {
             navigate(`/sales-orders/${result.data._id}`);
         } catch { }
     };
+
 
     const selectedWarehouse = warehouses.find((w) => w._id === sourceWarehouseId);
     const totalItems = totals.itemCount;
@@ -273,12 +371,14 @@ export default function PosPage() {
 
                     <div className="flex-1 flex items-center gap-2 min-w-0">
                         <div className="flex-1 min-w-0">
-                            <Select
-                                placeholder="Select customer..."
-                                options={customerOptions}
+                            <CustomerAutocompleteSelect
+                                placeholder="Select or type customer..."
+                                customers={customers}
                                 value={customerId}
-                                onChange={(e) => setCustomerId(e.target.value)}
-                                className="text-sm"
+                                onChange={(val) => setCustomerId(val)}
+                                onCreated={(newCust) => {
+                                    queryClient.invalidateQueries({ queryKey: ['customers'] });
+                                }}
                             />
                         </div>
                         <button
@@ -431,9 +531,9 @@ export default function PosPage() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
                             {filteredProducts.map((p) => {
                                 const stock = stockMap.get(p._id);
-                                const available = stock ? Math.max(0, stock.onHand - stock.reserved) : 0;
+                                const available = stock ? Math.max(0, stock.openStock - stock.reserved) : 0;
                                 const inCart = cart.find((i) => i.productId === p._id);
-                                const outOfStock = available <= 0;
+                                const outOfStock = !allowNegative && available <= 0;
                                 const lowStock = available > 0 && available <= 5;
 
                                 return (
@@ -470,7 +570,7 @@ export default function PosPage() {
 
                                         <div className="flex items-center justify-between gap-1">
                                             <p className="text-sm font-bold text-primary-600">
-                                                {fmt(p.basePrice)}
+                                                {fmt(p.basePrice || p.costs?.lastPurchaseCost || p.costs?.averageCost || 0)}
                                             </p>
                                             <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${outOfStock
                                                     ? 'bg-red-100 text-red-600'
@@ -478,7 +578,7 @@ export default function PosPage() {
                                                         ? 'bg-amber-100 text-amber-600'
                                                         : 'bg-green-100 text-green-600'
                                                 }`}>
-                                                {outOfStock ? 'Out' : available}
+                                                {outOfStock ? 'Out of Stock' : `${available} in stock`}
                                             </span>
                                         </div>
                                     </button>
@@ -510,6 +610,21 @@ export default function PosPage() {
                         isPending={createOrder.isPending}
                         customerId={customerId}
                         embedded
+                        paymentMethod={paymentMethod}
+                        setPaymentMethod={setPaymentMethod}
+                        bankAccountId={bankAccountId}
+                        setBankAccountId={setBankAccountId}
+                        paymentReference={paymentReference}
+                        setPaymentReference={setPaymentReference}
+                        chequeNumber={chequeNumber}
+                        setChequeNumber={setChequeNumber}
+                        chequeDate={chequeDate}
+                        setChequeDate={setChequeDate}
+                        bankName={bankName}
+                        setBankName={setBankName}
+                        chequeStatus={chequeStatus}
+                        setChequeStatus={setChequeStatus}
+                        bankAccounts={bankAccounts}
                     />
                 </div>
             </div>
@@ -607,6 +722,21 @@ export default function PosPage() {
                             isPending={createOrder.isPending}
                             customerId={customerId}
                             onCheckoutSuccess={() => setIsCartOpen(false)}
+                            paymentMethod={paymentMethod}
+                            setPaymentMethod={setPaymentMethod}
+                            bankAccountId={bankAccountId}
+                            setBankAccountId={setBankAccountId}
+                            paymentReference={paymentReference}
+                            setPaymentReference={setPaymentReference}
+                            chequeNumber={chequeNumber}
+                            setChequeNumber={setChequeNumber}
+                            chequeDate={chequeDate}
+                            setChequeDate={setChequeDate}
+                            bankName={bankName}
+                            setBankName={setBankName}
+                            chequeStatus={chequeStatus}
+                            setChequeStatus={setChequeStatus}
+                            bankAccounts={bankAccounts}
                         />
                     </div>
                 </div>
@@ -636,6 +766,14 @@ function CartPanel({
     orderDiscountPercent, setOrderDiscountPercent,
     updateQty, setQty, removeFromCart, clearCart, handleCheckout,
     isPending, customerId, embedded,
+    paymentMethod, setPaymentMethod,
+    bankAccountId, setBankAccountId,
+    paymentReference, setPaymentReference,
+    chequeNumber, setChequeNumber,
+    chequeDate, setChequeDate,
+    bankName, setBankName,
+    chequeStatus, setChequeStatus,
+    bankAccounts,
 }) {
     return (
         <>
@@ -660,7 +798,11 @@ function CartPanel({
                                 <div className="flex items-start justify-between mb-2">
                                     <div className="flex-1 min-w-0 pr-2">
                                         <p className="text-sm font-semibold text-gray-800 leading-tight truncate">{item.name}</p>
-                                        <p className="text-xs text-gray-400 font-mono mt-0.5">{item.code}</p>
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-400 font-mono mt-0.5">
+                                            <span>{item.code}</span>
+                                            <span>·</span>
+                                            <span className="text-green-600 font-medium">{item.available} Avail</span>
+                                        </div>
                                     </div>
                                     <button
                                         onClick={() => removeFromCart(item.productId)}
@@ -732,6 +874,112 @@ function CartPanel({
                     <div className="flex justify-between items-center pt-2 border-t border-gray-100">
                         <span className="font-bold text-gray-900 text-base">Total</span>
                         <span className="text-xl font-extrabold text-primary-600">{fmt(totals.grandTotal)}</span>
+                    </div>
+
+                    {/* Payment Method & Bank Accounts UI */}
+                    <div className="space-y-2 pt-2 border-t border-gray-100">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Method</span>
+                        <div className="grid grid-cols-4 gap-1">
+                            {[
+                                { id: 'cash', label: 'Cash' },
+                                { id: 'card', label: 'Card' },
+                                { id: 'bank_transfer', label: 'Bank' },
+                                { id: 'cheque', label: 'Cheque' }
+                            ].map((pm) => (
+                                <button
+                                    key={pm.id}
+                                    type="button"
+                                    onClick={() => setPaymentMethod(pm.id)}
+                                    className={`py-1.5 px-1 rounded-xl text-xs font-bold border-2 transition-all flex flex-col items-center justify-center gap-1 ${
+                                        paymentMethod === pm.id
+                                            ? 'border-primary-600 bg-primary-50 text-primary-700'
+                                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                                    }`}
+                                >
+                                    {pm.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Company Account Selector */}
+                        {paymentMethod !== 'cash' && (
+                            <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-gray-400">Account</label>
+                                <select
+                                    value={bankAccountId}
+                                    onChange={(e) => setBankAccountId(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs bg-white focus:border-primary-300 outline-none"
+                                >
+                                    <option value="">-- Select Account --</option>
+                                    {bankAccounts.map((acc) => (
+                                        <option key={acc._id} value={acc._id}>
+                                            {acc.bankName} - {acc.accountNumber}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Transaction Reference (Card / Bank Transfer) */}
+                        {(paymentMethod === 'card' || paymentMethod === 'bank_transfer') && (
+                            <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-gray-400">Reference Number</label>
+                                <input
+                                    type="text"
+                                    placeholder="Enter reference no."
+                                    value={paymentReference}
+                                    onChange={(e) => setPaymentReference(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs bg-white focus:border-primary-300 outline-none"
+                                />
+                            </div>
+                        )}
+
+                        {/* Cheque inputs */}
+                        {paymentMethod === 'cheque' && (
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase font-bold text-gray-400">Cheque Number</label>
+                                    <input
+                                        type="text"
+                                        placeholder="No."
+                                        value={chequeNumber}
+                                        onChange={(e) => setChequeNumber(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs bg-white focus:border-primary-300 outline-none"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase font-bold text-gray-400">Bank Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Bank"
+                                        value={bankName}
+                                        onChange={(e) => setBankName(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs bg-white focus:border-primary-300 outline-none"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase font-bold text-gray-400">Cheque Date</label>
+                                    <input
+                                        type="date"
+                                        value={chequeDate}
+                                        onChange={(e) => setChequeDate(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs bg-white focus:border-primary-300 outline-none"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] uppercase font-bold text-gray-400">Cheque Status</label>
+                                    <select
+                                        value={chequeStatus}
+                                        onChange={(e) => setChequeStatus(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs bg-white focus:border-primary-300 outline-none"
+                                    >
+                                        <option value="pending">Pending</option>
+                                        <option value="cleared">Cleared</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Action buttons */}

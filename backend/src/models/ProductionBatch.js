@@ -71,6 +71,12 @@ const productionBatchSchema = new mongoose.Schema({
   efficiencyPercentage: { type: Number, default: 0 },
   // Formula: (outputWeight_total / inputWeight_total) × 100
 
+  // ── Cost Details (LKR) ───────────────────────────────────────────────────
+  materialCost: { type: Number, default: 0 },
+  laborCost:    { type: Number, default: 0 },
+  overheadCost: { type: Number, default: 0 },
+  totalCost:    { type: Number, default: 0 },
+
   // ── MES Stage ────────────────────────────────────────────────────────────
   processingStage: {
     type: String,
@@ -122,6 +128,9 @@ productionBatchSchema.pre('save', function() {
       ((this.outputWeight_total / this.inputWeight_total) * 100).toFixed(2)
     );
   }
+
+  // 3.5. Compute Cost Totals
+  this.totalCost = (this.materialCost || 0) + (this.laborCost || 0) + (this.overheadCost || 0);
 
   // 4. Generate Julian Batch Code (new documents only)
   if (this.isNew && !this.batchNo) {

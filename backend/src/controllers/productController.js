@@ -37,6 +37,10 @@ export const getProducts = asyncHandler(async (req, res) => {
         brandId,
         status,
         type,
+        productType,
+        canBeSold,
+        canBePurchased,
+        canBeManufactured,
         minPrice,
         maxPrice,
         page = 1,
@@ -59,8 +63,16 @@ export const getProducts = asyncHandler(async (req, res) => {
 
     if (categoryId) filter.categoryId = categoryId;
     if (brandId) filter.brandId = brandId;
-    if (status) filter.status = status;
+    if (status && status !== 'all') {
+        filter.status = status;
+    } else if (status !== 'all') {
+        filter.status = 'active';
+    }
     if (type) filter.type = type;
+    if (productType) filter.productType = productType;
+    if (canBeSold !== undefined) filter.canBeSold = canBeSold === 'true' || canBeSold === true;
+    if (canBePurchased !== undefined) filter.canBePurchased = canBePurchased === 'true' || canBePurchased === true;
+    if (canBeManufactured !== undefined) filter.canBeManufactured = canBeManufactured === 'true' || canBeManufactured === true;
 
     if (minPrice || maxPrice) {
         filter.basePrice = {};
