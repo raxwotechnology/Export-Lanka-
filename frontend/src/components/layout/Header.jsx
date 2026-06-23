@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User as UserIcon, Menu } from 'lucide-react';
+import { LogOut, User as UserIcon, Menu, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../features/auth/authApi';
@@ -42,9 +42,15 @@ export default function Header({ onToggleSidebar }) {
                 >
                     <Menu size={20} />
                 </button>
-                <h1 className="text-sm sm:text-lg font-semibold text-gray-900 truncate max-w-[120px] sm:max-w-none">
-                    Welcome, {user?.firstName}
-                </h1>
+                
+                <div className="flex items-center gap-2.5 px-3.5 py-1.5 bg-gradient-to-r from-primary-50 to-blue-50/20 rounded-full border border-primary-100/50 shadow-sm transition hover:shadow duration-200">
+                    <div className="w-5 h-5 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0">
+                        <Sparkles size={11} className="animate-pulse" />
+                    </div>
+                    <span className="text-xs sm:text-sm text-gray-700 truncate max-w-[160px] sm:max-w-none font-medium">
+                        Welcome, <span className="font-bold text-primary-700">{user?.fullName || user?.firstName || 'User'}</span>
+                    </span>
+                </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4">
@@ -57,7 +63,9 @@ export default function Header({ onToggleSidebar }) {
                         </button>
                     </div>
                     <div className="text-sm hidden md:block">
-                        <p className="font-medium text-gray-900 leading-tight">{user?.fullName}</p>
+                        <p className="font-medium text-gray-900 leading-tight">
+                            {user?.fullName === 'New Admin' ? 'Admin Panel' : (user?.fullName === 'Admin User' ? roleLabel : user?.fullName)}
+                        </p>
                         <p className="text-xs text-gray-500 leading-tight">{roleLabel}</p>
                     </div>
                 </div>

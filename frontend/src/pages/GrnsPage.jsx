@@ -8,6 +8,9 @@ import Button from '../components/ui/Button';
 import Table from '../components/ui/Table';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import Textarea from '../components/ui/Textarea';
 import EmptyState from '../components/ui/EmptyState';
 import { useAuthStore } from '../store/authStore';
 import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
@@ -520,19 +523,16 @@ export default function GrnsPage() {
                         ))}
                     </div>
 
-                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-150 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-1">Paid Amount (LKR) — If paid cash instantly</label>
-                            <input
-                                type="number"
-                                min="0"
-                                step="any"
-                                placeholder="0.00"
-                                value={paidAmountLKR}
-                                onChange={(e) => setPaidAmountLKR(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
-                            />
-                        </div>
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-150">
+                        <Input
+                            label="Paid Amount (LKR) — If paid cash instantly"
+                            type="number"
+                            min="0"
+                            step="any"
+                            placeholder="0.00"
+                            value={paidAmountLKR}
+                            onChange={(e) => setPaidAmountLKR(e.target.value)}
+                        />
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
@@ -553,7 +553,7 @@ export default function GrnsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs font-bold text-gray-600 block mb-1">Receipt Type</label>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                                 <button
                                     type="button"
                                     onClick={() => handlePoChange('')}
@@ -564,7 +564,7 @@ export default function GrnsPage() {
                                 <select
                                     value={formData.purchaseOrderId}
                                     onChange={(e) => handlePoChange(e.target.value)}
-                                    className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium ${formData.purchaseOrderId ? 'border-primary-500 text-primary-600 font-bold' : 'border-gray-200 text-gray-600'}`}
+                                    className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none bg-white font-medium transition ${formData.purchaseOrderId ? 'border-primary-500 text-primary-600 font-bold focus:ring-2 focus:ring-primary-200' : 'border-gray-300 text-gray-600 focus:ring-2 focus:ring-primary-200'}`}
                                 >
                                     <option value="">Receive against PO</option>
                                     {purchaseOrders.map(po => (
@@ -574,143 +574,112 @@ export default function GrnsPage() {
                             </div>
                         </div>
 
-                        <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-1">Receipt Date *</label>
-                            <input
-                                type="date"
-                                value={formData.receiptDate}
-                                onChange={(e) => setFormData(p => ({ ...p, receiptDate: e.target.value }))}
-                                required
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none font-medium"
-                            />
-                        </div>
+                        <Input
+                            label="Receipt Date *"
+                            type="date"
+                            value={formData.receiptDate}
+                            onChange={(e) => setFormData(p => ({ ...p, receiptDate: e.target.value }))}
+                            required
+                        />
                     </div>
 
                     {!formData.purchaseOrderId && (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="text-xs font-bold text-gray-600 block mb-1">Material Source Type *</label>
-                                <select
-                                    value={formData.sourceType}
-                                    onChange={(e) => setFormData(p => ({ ...p, sourceType: e.target.value }))}
-                                    required
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-semibold"
-                                >
-                                    <option value="supplier">Supplier</option>
-                                    <option value="own_farm">Own Farm</option>
-                                </select>
-                            </div>
+                            <Select
+                                label="Material Source Type *"
+                                value={formData.sourceType}
+                                onChange={(e) => setFormData(p => ({ ...p, sourceType: e.target.value }))}
+                                required
+                            >
+                                <option value="supplier">Supplier</option>
+                                <option value="own_farm">Own Farm</option>
+                            </Select>
 
                             {formData.sourceType === 'supplier' ? (
-                                <div>
-                                    <label className="text-xs font-bold text-gray-600 block mb-1">Supplier *</label>
-                                    <select
-                                        value={formData.supplierId}
-                                        onChange={(e) => setFormData(p => ({ ...p, supplierId: e.target.value }))}
-                                        required
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
-                                    >
-                                        <option value="">Select Supplier</option>
-                                        {suppliers.map(s => (
-                                            <option key={s._id} value={s._id}>{s.displayName || s.companyName}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <Select
+                                    label="Supplier *"
+                                    value={formData.supplierId}
+                                    onChange={(e) => setFormData(p => ({ ...p, supplierId: e.target.value }))}
+                                    required
+                                    placeholder="Select Supplier"
+                                >
+                                    {suppliers.map(s => (
+                                        <option key={s._id} value={s._id}>{s.displayName || s.companyName}</option>
+                                    ))}
+                                </Select>
                             ) : (
-                                <div>
-                                    <label className="text-xs font-bold text-gray-600 block mb-1">Source Farm *</label>
-                                    <select
-                                        value={formData.farmId}
-                                        onChange={(e) => setFormData(p => ({ ...p, farmId: e.target.value }))}
-                                        required
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
-                                    >
-                                        <option value="">Select Farm</option>
-                                        {farms.map(f => (
-                                            <option key={f._id} value={f._id}>{f.name} ({f.farmCode})</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <Select
+                                    label="Source Farm *"
+                                    value={formData.farmId}
+                                    onChange={(e) => setFormData(p => ({ ...p, farmId: e.target.value }))}
+                                    required
+                                    placeholder="Select Farm"
+                                >
+                                    {farms.map(f => (
+                                        <option key={f._id} value={f._id}>{f.name} ({f.farmCode})</option>
+                                    ))}
+                                </Select>
                             )}
 
-                            <div>
-                                <label className="text-xs font-bold text-gray-600 block mb-1">Intake Warehouse *</label>
-                                <select
-                                    value={formData.warehouseId}
-                                    onChange={(e) => setFormData(p => ({ ...p, warehouseId: e.target.value }))}
-                                    required
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
-                                >
-                                    {warehouses.map(w => (
-                                        <option key={w._id} value={w._id}>{w.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    )}
-
-                    {formData.purchaseOrderId && (
-                        <div>
-                            <span className="text-xs font-bold text-blue-650 block mb-1">Intake Warehouse *</span>
-                            <select
+                            <Select
+                                label="Intake Warehouse *"
                                 value={formData.warehouseId}
                                 onChange={(e) => setFormData(p => ({ ...p, warehouseId: e.target.value }))}
                                 required
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
+                                placeholder="Select Warehouse"
                             >
                                 {warehouses.map(w => (
                                     <option key={w._id} value={w._id}>{w.name}</option>
                                 ))}
-                            </select>
+                            </Select>
                         </div>
                     )}
 
+                    {formData.purchaseOrderId && (
+                        <Select
+                            label="Intake Warehouse *"
+                            value={formData.warehouseId}
+                            onChange={(e) => setFormData(p => ({ ...p, warehouseId: e.target.value }))}
+                            required
+                            placeholder="Select Warehouse"
+                        >
+                            {warehouses.map(w => (
+                                <option key={w._id} value={w._id}>{w.name}</option>
+                            ))}
+                        </Select>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-1">Delivery Note No.</label>
-                            <input
-                                type="text"
-                                value={formData.supplierDeliveryNoteNumber}
-                                onChange={(e) => setFormData(p => ({ ...p, supplierDeliveryNoteNumber: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-1">Invoice Ref No.</label>
-                            <input
-                                type="text"
-                                value={formData.supplierInvoiceNumber}
-                                onChange={(e) => setFormData(p => ({ ...p, supplierInvoiceNumber: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-1">Vehicle No.</label>
-                            <input
-                                type="text"
-                                value={formData.vehicleNumber}
-                                onChange={(e) => setFormData(p => ({ ...p, vehicleNumber: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-1">Driver Name</label>
-                            <input
-                                type="text"
-                                value={formData.driverName}
-                                onChange={(e) => setFormData(p => ({ ...p, driverName: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-1">Transport Company</label>
-                            <input
-                                type="text"
-                                value={formData.transportCompany}
-                                onChange={(e) => setFormData(p => ({ ...p, transportCompany: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                            />
-                        </div>
+                        <Input
+                            label="Delivery Note No."
+                            type="text"
+                            value={formData.supplierDeliveryNoteNumber}
+                            onChange={(e) => setFormData(p => ({ ...p, supplierDeliveryNoteNumber: e.target.value }))}
+                        />
+                        <Input
+                            label="Invoice Ref No."
+                            type="text"
+                            value={formData.supplierInvoiceNumber}
+                            onChange={(e) => setFormData(p => ({ ...p, supplierInvoiceNumber: e.target.value }))}
+                        />
+                        <Input
+                            label="Vehicle No."
+                            type="text"
+                            value={formData.vehicleNumber}
+                            onChange={(e) => setFormData(p => ({ ...p, vehicleNumber: e.target.value }))}
+                        />
+                        <Input
+                            label="Driver Name"
+                            type="text"
+                            value={formData.driverName}
+                            onChange={(e) => setFormData(p => ({ ...p, driverName: e.target.value }))}
+                        />
+                        <Input
+                            label="Transport Company"
+                            type="text"
+                            value={formData.transportCompany}
+                            onChange={(e) => setFormData(p => ({ ...p, transportCompany: e.target.value }))}
+                        />
                     </div>
 
                     {/* Direct GRN items entry form */}
@@ -736,30 +705,24 @@ export default function GrnsPage() {
                                         }}
                                     />
                                 </div>
-                                <div>
-                                    <label className="text-xs font-semibold text-gray-500 block mb-1">Quantity *</label>
-                                    <input
-                                        type="number"
-                                        min="0.01"
-                                        step="any"
-                                        placeholder="0.00"
-                                        value={newItem.receivedQuantity}
-                                        onChange={(e) => setNewItem(p => ({ ...p, receivedQuantity: e.target.value }))}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-semibold text-gray-500 block mb-1">Unit Price (LKR) *</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="any"
-                                        placeholder="0.00"
-                                        value={newItem.unitPrice}
-                                        onChange={(e) => setNewItem(p => ({ ...p, unitPrice: e.target.value }))}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                                    />
-                                </div>
+                                <Input
+                                    label="Quantity *"
+                                    type="number"
+                                    min="0.01"
+                                    step="any"
+                                    placeholder="0.00"
+                                    value={newItem.receivedQuantity}
+                                    onChange={(e) => setNewItem(p => ({ ...p, receivedQuantity: e.target.value }))}
+                                />
+                                <Input
+                                    label="Unit Price (LKR) *"
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    placeholder="0.00"
+                                    value={newItem.unitPrice}
+                                    onChange={(e) => setNewItem(p => ({ ...p, unitPrice: e.target.value }))}
+                                />
                                 <div className="md:col-span-4 flex justify-end">
                                     <Button type="button" variant="primary" onClick={handleAddItem}>
                                         Add Line Item
@@ -831,16 +794,13 @@ export default function GrnsPage() {
                         </div>
                     </div>
 
-                    <div>
-                        <label className="text-xs font-bold text-gray-600 block mb-1">Receipt Notes / Comments</label>
-                        <textarea
-                            placeholder="Add any additional transport or warehouse notes here..."
-                            value={formData.notes}
-                            onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))}
-                            rows={3}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                        />
-                    </div>
+                    <Textarea
+                        label="Receipt Notes / Comments"
+                        placeholder="Add any additional transport or warehouse notes here..."
+                        value={formData.notes}
+                        onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))}
+                        rows={3}
+                    />
 
                     <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
                         <Button type="button" variant="default" onClick={() => setIsFormOpen(false)}>Cancel</Button>

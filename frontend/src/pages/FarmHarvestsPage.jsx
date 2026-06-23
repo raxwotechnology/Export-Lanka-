@@ -8,6 +8,9 @@ import Button from '../components/ui/Button';
 import Table from '../components/ui/Table';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import Textarea from '../components/ui/Textarea';
 import EmptyState from '../components/ui/EmptyState';
 import { useAuthStore } from '../store/authStore';
 import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
@@ -312,44 +315,35 @@ export default function FarmHarvestsPage() {
             >
                 <form onSubmit={handleFormSubmit} className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-1">Source Farm *</label>
-                            <select
-                                value={formData.farmId}
-                                onChange={(e) => setFormData(p => ({ ...p, farmId: e.target.value }))}
-                                required
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none bg-white font-medium"
-                            >
-                                {farms.map(f => (
-                                    <option key={f._id} value={f._id}>{f.name} ({f.farmCode})</option>
-                                ))}
-                            </select>
-                        </div>
+                        <Select
+                            label="Source Farm *"
+                            value={formData.farmId}
+                            onChange={(e) => setFormData(p => ({ ...p, farmId: e.target.value }))}
+                            required
+                        >
+                            {farms.map(f => (
+                                <option key={f._id} value={f._id}>{f.name} ({f.farmCode})</option>
+                            ))}
+                        </Select>
 
-                        <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-1">Intake Warehouse *</label>
-                            <select
-                                value={formData.warehouseId}
-                                onChange={(e) => setFormData(p => ({ ...p, warehouseId: e.target.value }))}
-                                required
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none bg-white font-medium"
-                            >
-                                {warehouses.map(w => (
-                                    <option key={w._id} value={w._id}>{w.name}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <Select
+                            label="Intake Warehouse *"
+                            value={formData.warehouseId}
+                            onChange={(e) => setFormData(p => ({ ...p, warehouseId: e.target.value }))}
+                            required
+                        >
+                            {warehouses.map(w => (
+                                <option key={w._id} value={w._id}>{w.name}</option>
+                            ))}
+                        </Select>
 
-                        <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-1">Harvest Date *</label>
-                            <input
-                                type="date"
-                                value={formData.harvestDate}
-                                onChange={(e) => setFormData(p => ({ ...p, harvestDate: e.target.value }))}
-                                required
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none font-medium"
-                            />
-                        </div>
+                        <Input
+                            label="Harvest Date *"
+                            type="date"
+                            value={formData.harvestDate}
+                            onChange={(e) => setFormData(p => ({ ...p, harvestDate: e.target.value }))}
+                            required
+                        />
                     </div>
 
                     <div className="border border-gray-150 p-4 rounded-xl bg-gray-50 space-y-4">
@@ -373,30 +367,24 @@ export default function FarmHarvestsPage() {
                                     }}
                                 />
                             </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-600 block mb-1">Harvest Qty (Kg/Nos) *</label>
-                                <input
-                                    type="number"
-                                    min="0.01"
-                                    step="any"
-                                    placeholder="0.00"
-                                    value={newItem.quantity}
-                                    onChange={(e) => setNewItem(p => ({ ...p, quantity: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-600 block mb-1">Est. Unit Price (Optional)</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="any"
-                                    placeholder="Base price"
-                                    value={newItem.unitPrice}
-                                    onChange={(e) => setNewItem(p => ({ ...p, unitPrice: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                                />
-                            </div>
+                            <Input
+                                label="Harvest Qty (Kg/Nos) *"
+                                type="number"
+                                min="0.01"
+                                step="any"
+                                placeholder="0.00"
+                                value={newItem.quantity}
+                                onChange={(e) => setNewItem(p => ({ ...p, quantity: e.target.value }))}
+                            />
+                            <Input
+                                label="Est. Unit Price (Optional)"
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder="Base price"
+                                value={newItem.unitPrice}
+                                onChange={(e) => setNewItem(p => ({ ...p, unitPrice: e.target.value }))}
+                            />
                             <div className="md:col-span-1 flex items-end">
                                 <Button type="button" variant="primary" onClick={handleAddItem} className="w-full">
                                     Add Item
@@ -443,16 +431,13 @@ export default function FarmHarvestsPage() {
                         </div>
                     </div>
 
-                    <div>
-                        <label className="text-xs font-bold text-gray-600 block mb-1">Additional Notes</label>
-                        <textarea
-                            placeholder="e.g. Good harvest condition. Moisture check pending."
-                            value={formData.notes}
-                            onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))}
-                            rows={3}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                        />
-                    </div>
+                    <Textarea
+                        label="Additional Notes"
+                        placeholder="e.g. Good harvest condition. Moisture check pending."
+                        value={formData.notes}
+                        onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))}
+                        rows={3}
+                    />
 
                     <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
                         <Button type="button" variant="default" onClick={() => setIsFormOpen(false)}>Cancel</Button>

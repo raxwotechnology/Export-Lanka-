@@ -6,6 +6,7 @@ import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
 import Textarea from '../components/ui/Textarea';
 import Table from '../components/ui/Table';
 import Badge from '../components/ui/Badge';
@@ -236,17 +237,14 @@ export default function FarmsPage() {
                         rows={3}
                     />
 
-                    <div>
-                        <label className="text-xs font-bold text-gray-600 block mb-1">Status</label>
-                        <select
-                            value={formData.status}
-                            onChange={(e) => setFormData(p => ({ ...p, status: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                        >
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                        </select>
-                    </div>
+                    <Select
+                        label="Status"
+                        value={formData.status}
+                        onChange={(e) => setFormData(p => ({ ...p, status: e.target.value }))}
+                    >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </Select>
 
                     <div className="flex justify-end gap-3 pt-2">
                         <Button type="button" variant="default" onClick={() => { setIsFormOpen(false); setEditing(null); }}>Cancel</Button>

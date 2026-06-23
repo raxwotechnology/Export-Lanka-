@@ -29,7 +29,7 @@ export default function SettingsPage() {
     const { register, handleSubmit, reset, formState: { errors } } = useForm({
         resolver: zodResolver(settingsSchema),
         defaultValues: {
-            companyName: 'Wholesale ERP',
+            companyName: 'Authentic Lanka Exports ERP',
             currency: 'LKR',
             currencySymbol: 'Rs.',
             defaultTaxRate: 0,

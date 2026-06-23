@@ -8,6 +8,7 @@ import {
     ClipboardList, UserPlus, Ship, Layers, History, FileSpreadsheet,
     ChevronDown, ChevronRight, CheckSquare, ClipboardCheck, BadgeCheck,
     PackageCheck, CreditCard, Tag, Mail, Sparkles, Home, Search, Scale,
+    Plus, ArrowLeftRight, Sliders, LineChart, PieChart, TrendingUp, UserCheck
 } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
 
@@ -15,12 +16,15 @@ import { usePermission } from '../../hooks/usePermission';
 const menuGroups = [
     {
         label: 'Overview',
+        icon: LayoutDashboard,
         items: [
             { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', permission: 'dashboard.view' },
+            { label: 'My Profile', icon: UserCheck, path: '/profile' },
         ],
     },
     {
-        label: 'Catalog',
+        label: 'PRODUCT MASTER',
+        icon: FolderTree,
         items: [
             { label: 'Products', icon: Package, path: '/products', permission: 'products.view' },
             { label: 'Categories', icon: FolderTree, path: '/categories', permission: 'products.view' },
@@ -28,108 +32,88 @@ const menuGroups = [
         ],
     },
     {
-        label: 'Inventory',
+        label: 'INVENTORY & STOCK',
+        icon: Boxes,
         items: [
             { label: 'Warehouses', icon: Warehouse, path: '/warehouses', permission: 'inventory.view' },
-            { label: 'Stock', icon: Boxes, path: '/stock', permission: 'inventory.view' },
-            { label: 'Raw Materials', icon: Layers, path: '/inventory/raw-materials', permission: 'inventory.view' },
-            { label: 'Inventory Converter', icon: Workflow, path: '/inventory/converter', permission: 'inventory.adjust' },
-            { label: 'Inventory Recipes', icon: Scale, path: '/inventory-recipes', permission: 'bom.view' },
+            { label: 'Stock Overview', icon: Boxes, path: '/stock', permission: 'inventory.view' },
+            { label: 'Opening Stock', icon: Plus, path: '/stock/opening', permission: 'inventory.opening' },
+            { label: 'Stock Transfer', icon: ArrowLeftRight, path: '/stock/transfer', permission: 'inventory.transfer' },
+            { label: 'Stock Adjustment', icon: Sliders, path: '/stock/adjustment', permission: 'inventory.adjust' },
+            { label: 'Stock Movements', icon: History, path: '/stock/movements', permission: 'inventory.view' },
+            { label: 'Raw Materials Inventory', icon: Layers, path: '/inventory/raw-materials', permission: 'inventory.view' },
+            { label: 'BOM / Recipe Converter', icon: Workflow, path: '/inventory/converter', permission: 'inventory.adjust' },
+            { label: 'Conversion Recipes', icon: Scale, path: '/inventory-recipes', permission: 'bom.view' },
         ],
     },
     {
-        label: 'Farms',
+        label: 'PROCUREMENT & SUPPLY',
+        icon: ShoppingBag,
         items: [
+            { label: 'Suppliers / Farms', icon: Truck, path: '/suppliers', permission: 'suppliers.view' },
             { label: 'Farms Registry', icon: Home, path: '/farms', permission: 'grn.manage' },
-            { label: 'Own Farm Harvests', icon: CalendarIcon, path: '/farms/harvests', permission: 'grn.manage' },
-        ],
-    },
-    {
-        label: 'Customers',
-        items: [
-            { label: 'Customers', icon: UserCircle, path: '/customers', permission: 'customers.view' },
-            { label: 'Customer Groups', icon: Tags, path: '/customer-groups', permission: 'customers.view' },
-        ],
-    },
-    {
-        label: 'CRM & Global Sales',
-        items: [
-            { label: 'Leads/Inquiries', icon: UserPlus, path: '/crm/inquiries', permission: 'customers.view' },
-            { label: 'Quotations', icon: FileText, path: '/crm/quotations', permission: 'sales.view' },
-            { label: 'Sales Orders', icon: ShoppingCart, path: '/sales-orders', permission: 'sales.view' },
-            { label: 'POS', icon: Calculator, path: '/pos', permission: 'pos.access' },
-        ],
-    },
-    {
-        label: 'Logistics & Export',
-        items: [
-            { label: 'Shipment Tracking', icon: Ship, path: '/logistics/shipments', permission: 'inventory.view' },
-            { label: 'Warehouse Export', icon: Warehouse, path: '/warehouses', permission: 'inventory.view' },
-            { label: 'Gate Passes', icon: ShieldCheck, path: '/logistics/gate-passes', permission: 'inventory.view' },
-            { label: 'Gate Security Screen', icon: Navigation, path: '/gate-screen', permission: 'inventory.view' },
-        ],
-    },
-    {
-        label: 'Procurement',
-        items: [
-            { label: 'Suppliers', icon: Truck, path: '/suppliers', permission: 'suppliers.view' },
+            { label: 'Farm Harvests (GRN)', icon: CalendarIcon, path: '/farms/harvests', permission: 'grn.manage' },
             { label: 'Purchase Orders', icon: ShoppingBag, path: '/purchase-orders', permission: 'purchasing.view' },
-            { label: 'GRNs (Material Receipts)', icon: PackageCheck, path: '/grns', permission: 'grn.manage' },
-            { label: 'Bills', icon: Receipt, path: '/bills', permission: 'bills.view' },
+            { label: 'Goods Receipt Notes (GRN)', icon: PackageCheck, path: '/grns', permission: 'grn.manage' },
+            { label: 'Supplier Bills', icon: Receipt, path: '/bills', permission: 'bills.view' },
         ],
     },
     {
-        label: 'Finance',
+        label: 'PRODUCTION',
+        icon: Factory,
         items: [
-            { label: 'Invoices', icon: FileText, path: '/invoices', permission: 'invoices.view' },
-            { label: 'Payments', icon: Wallet, path: '/payments', permission: 'payments.view' },
-            { label: 'Cheque Ledger', icon: FileSpreadsheet, path: '/finance/cheques', permission: 'payments.view' },
-            { label: 'Bank Accounts', icon: Building2, path: '/finance/bank-accounts', permission: 'payments.view' },
-            { label: 'Petty Cash', icon: DollarSign, path: '/finance/petty-cash', permission: 'payments.view' },
-            { label: 'Fixed Assets', icon: Tag, path: '/finance/fixed-assets', permission: 'payments.view' },
-            { label: 'Credit Notes', icon: FileMinus, path: '/credit-notes', permission: 'credit_notes.view' },
-        ],
-    },
-    {
-        label: 'Production',
-        items: [
-            { label: 'BOMs (Recipes)', icon: Workflow, path: '/boms', permission: 'bom.view' },
+            { label: 'Production Recipes (BOM)', icon: Workflow, path: '/boms', permission: 'bom.view' },
             { label: 'Process Templates', icon: ClipboardList, path: '/manufacturing/templates', permission: 'production.view' },
             { label: 'Production Batches', icon: Layers, path: '/manufacturing/batches', permission: 'production.view' },
             { label: 'Production Orders', icon: Factory, path: '/production-orders', permission: 'production.view' },
         ],
     },
     {
-        label: 'Fleet & Logistics',
+        label: 'FINANCE',
+        icon: DollarSign,
         items: [
-            { label: 'Vehicle Management', icon: Truck, path: '/fleet/vehicles', permission: 'inventory.view' },
-            { label: 'Trip Logs', icon: Navigation, path: '/fleet/vehicles', permission: 'inventory.view' },
-            { label: 'Maintenance', icon: Wrench, path: '/maintenance/requests', permission: 'admin.settings' },
+            { label: 'Customer Invoices', icon: FileText, path: '/invoices', permission: 'invoices.view' },
+            { label: 'Payments', icon: Wallet, path: '/payments', permission: 'payments.view' },
+            { label: 'Cheque Ledger', icon: FileSpreadsheet, path: '/finance/cheques', permission: 'payments.view' },
+            { label: 'Bank Accounts', icon: Building2, path: '/finance/bank-accounts', permission: 'payments.view' },
+            { label: 'Petty Cash', icon: DollarSign, path: '/finance/petty-cash', permission: 'payments.view' },
+            { label: 'Capital Expenditure (CapEx)', icon: Tag, path: '/finance/fixed-assets', permission: 'payments.view' },
+            { label: 'Credit Notes', icon: FileMinus, path: '/credit-notes', permission: 'credit_notes.view' },
         ],
     },
     {
-        label: 'After-Sales',
+        label: 'SALES & CRM',
+        icon: ShoppingCart,
         items: [
-            { label: 'Returns (RMA)', icon: RotateCcw, path: '/returns', permission: 'returns.view' },
+            { label: 'Customers', icon: UserCircle, path: '/customers', permission: 'customers.view' },
+            { label: 'Customer Groups', icon: Tags, path: '/customer-groups', permission: 'customers.view' },
+            { label: 'Sales Inquiries', icon: UserPlus, path: '/crm/inquiries', permission: 'customers.view' },
+            { label: 'Quotations', icon: FileText, path: '/crm/quotations', permission: 'sales.view' },
+            { label: 'Sales Orders', icon: ShoppingCart, path: '/sales-orders', permission: 'sales.view' },
+            { label: 'Sales Pipeline', icon: TrendingUp, path: '/crm/inquiries', permission: 'customers.view' },
+            { label: 'POS', icon: Calculator, path: '/pos', permission: 'pos.access' },
+            { label: 'Customer Returns', icon: RotateCcw, path: '/returns', permission: 'returns.view' },
             { label: 'Supplier Returns', icon: RotateCcw, path: '/supplier-returns', permission: 'supplier_returns.view' },
             { label: 'Damages', icon: AlertTriangle, path: '/damages', permission: 'damages.view' },
             { label: 'Repairs', icon: Wrench, path: '/repairs', permission: 'repairs.view' },
         ],
     },
     {
-        label: 'Administration',
-        adminOnly: true,
+        label: 'LOGISTICS & TRANSPORT',
+        icon: Truck,
         items: [
-            { label: 'Users', icon: Users, path: '/users', permission: 'admin.users.view' },
-            { label: 'Roles', icon: ShieldCheck, path: '/roles', permission: 'admin.roles.view' },
-            { label: 'Data Import', icon: Upload, path: '/import', permission: 'admin.settings' },
-            { label: 'Audit Logs', icon: History, path: '/audit-logs', permission: 'view_audit_logs' },
-            { label: 'SMS Dispatch Logs', icon: Mail, path: '/audit-logs/sms', permission: 'view_audit_logs' },
-            { label: 'Settings', icon: Settings, path: '/settings', permission: 'admin.settings' },
+            { label: 'Shipment Tracking', icon: Ship, path: '/logistics/shipments', permission: 'inventory.view' },
+            { label: 'Export Logistics', icon: Warehouse, path: '/warehouses', permission: 'inventory.view' },
+            { label: 'Gate Pass Management', icon: ShieldCheck, path: '/logistics/gate-passes', permission: 'inventory.view' },
+            { label: 'Gate Screen', icon: ShieldCheck, path: '/gate-screen', permission: 'inventory.view' },
+            { label: 'Vehicle Management', icon: Truck, path: '/fleet/vehicles', permission: 'inventory.view' },
+            { label: 'Trip Logs', icon: Navigation, path: '/fleet/vehicles', permission: 'inventory.view' },
+            { label: 'Vehicle Maintenance', icon: Wrench, path: '/maintenance/requests', permission: 'admin.settings' },
         ],
     },
     {
-        label: 'HR',
+        label: 'HR & PAYROLL',
+        icon: UsersIcon,
         items: [
             { label: 'Employees', icon: UsersIcon, path: '/employees', permission: 'hr.employees.view' },
             { label: 'Departments', icon: Building2, path: '/departments', permission: 'hr.employees.view' },
@@ -144,10 +128,40 @@ const menuGroups = [
         ],
     },
     {
-        label: 'Reports & AI',
+        label: 'REPORTS',
+        icon: BarChart3,
         items: [
-            { label: 'Reports', icon: BarChart3, path: '/reports', anyPermission: ['reports.sales', 'reports.financial', 'reports.inventory', 'reports.hr', 'reports.production'] },
-            { label: 'Future Predictions', icon: Sparkles, path: '/reports/predictions', anyPermission: ['reports.sales', 'reports.financial', 'reports.inventory', 'reports.production'] },
+            { label: 'Reports Hub', icon: BarChart3, path: '/reports', anyPermission: ['reports.sales', 'reports.financial', 'reports.inventory', 'reports.hr', 'reports.production'] },
+            { label: 'Sales Summary', icon: TrendingUp, path: '/reports/sales', permission: 'reports.sales' },
+            { label: 'Sales by Product', icon: Package, path: '/reports/sales-by-product', permission: 'reports.sales' },
+            { label: 'Sales by Customer', icon: UsersIcon, path: '/reports/sales-by-customer', permission: 'reports.sales' },
+            { label: 'Stock Valuation', icon: DollarSign, path: '/reports/stock-valuation', permission: 'reports.inventory' },
+            { label: 'Slow & Fast Movers', icon: TrendingUp, path: '/reports/slow-fast-movers', permission: 'reports.inventory' },
+            { label: 'Low Stock Items', icon: AlertTriangle, path: '/reports/inventory/low-stock', permission: 'reports.inventory' },
+            { label: 'Stock Movement Log', icon: History, path: '/reports/stock-movement', permission: 'reports.inventory' },
+            { label: 'Daily Stock Status', icon: FileText, path: '/reports/daily-stock-status', permission: 'reports.inventory' },
+            { label: 'Production Summary', icon: Factory, path: '/reports/production', permission: 'reports.production' },
+            { label: 'Yield & Resource Forecaster', icon: Sparkles, path: '/reports/yield-forecaster', permission: 'reports.production' },
+            { label: 'Returns & Damages', icon: RotateCcw, path: '/reports/returns-damages', permission: 'reports.sales' },
+            { label: 'Financial Snapshot', icon: DollarSign, path: '/reports/financial', permission: 'reports.financial' },
+            { label: 'Daily P&L Master', icon: LineChart, path: '/reports/daily-pnl', permission: 'reports.financial' },
+            { label: 'Variance & Sales Comparator', icon: BarChart3, path: '/reports/variance-comparator', permission: 'reports.financial' },
+            { label: 'HR Reports', icon: UsersIcon, path: '/reports/hr', permission: 'reports.hr' },
+            { label: 'Shift Operations Logs', icon: Clock, path: '/reports/shift-wise', permission: 'reports.hr' },
+            { label: 'Forecasting', icon: Sparkles, path: '/reports/predictions', anyPermission: ['reports.sales', 'reports.financial', 'reports.inventory', 'reports.production'] },
+        ],
+    },
+    {
+        label: 'SYSTEM ADMIN',
+        icon: Settings,
+        adminOnly: true,
+        items: [
+            { label: 'Users', icon: Users, path: '/users', permission: 'admin.users.view' },
+            { label: 'Roles & Permissions', icon: ShieldCheck, path: '/roles', permission: 'admin.roles.view' },
+            { label: 'Data Import', icon: Upload, path: '/import', permission: 'admin.settings' },
+            { label: 'Audit Logs', icon: History, path: '/audit-logs', permission: 'view_audit_logs' },
+            { label: 'SMS Logs', icon: Mail, path: '/audit-logs/sms', permission: 'view_audit_logs' },
+            { label: 'Settings', icon: Settings, path: '/settings', permission: 'admin.settings' },
         ],
     },
 ];
@@ -306,6 +320,78 @@ function ApprovalCategory({ category, hasPermission, hasAnyPermission, isAdmin, 
     );
 }
 
+// ── Regular menu group accordion component ────────────────────────────────────
+function MenuGroup({ group, searchQuery }) {
+    const visibleItems = group.items;
+    const isActive = useIsCategoryActive(visibleItems);
+    const [isOpen, setIsOpen] = useState(isActive);
+
+    // Auto-open if a child is currently active or if searching
+    useEffect(() => {
+        if (searchQuery) {
+            setIsOpen(visibleItems.length > 0);
+        } else {
+            setIsOpen(isActive);
+        }
+    }, [searchQuery, isActive, visibleItems.length]);
+
+    if (visibleItems.length === 0) return null;
+
+    const Icon = group.icon;
+
+    return (
+        <div className="mb-2">
+            {/* Category header button */}
+            <button
+                onClick={() => setIsOpen((prev) => !prev)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                        ? 'bg-primary-50 text-primary-700 font-bold'
+                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+            >
+                {Icon && <Icon size={16} className={`flex-shrink-0 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />}
+                <span className="flex-1 text-left truncate text-xs font-semibold uppercase tracking-wider">{group.label}</span>
+                {isOpen
+                    ? <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />
+                    : <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
+                }
+            </button>
+
+            {/* Collapsible items */}
+            <div
+                style={{
+                    maxHeight: isOpen ? `${visibleItems.length * 44}px` : '0px',
+                    overflow: 'hidden',
+                    transition: 'max-height 0.22s ease',
+                }}
+            >
+                <div className="ml-3 pl-3 border-l border-gray-100 mt-1 space-y-0.5">
+                    {visibleItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                            <NavLink
+                                key={`${item.label}-${item.path}`}
+                                to={item.path}
+                                className={({ isActive }) =>
+                                    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        isActive
+                                            ? 'bg-primary-50 text-primary-700'
+                                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                    }`
+                                }
+                            >
+                                <Icon size={16} className="flex-shrink-0 text-gray-400" />
+                                <span className="truncate">{item.label}</span>
+                            </NavLink>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ── Main Sidebar component ────────────────────────────────────────────────────
 export default function Sidebar({ isOpen, onClose }) {
     const sidebarRef = useRef(null);
@@ -425,8 +511,8 @@ export default function Sidebar({ isOpen, onClose }) {
                                 <Package className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                                <h2 className="font-semibold text-gray-900 leading-none">Wholesale</h2>
-                                <p className="text-xs text-gray-500 mt-0.5">ERP System</p>
+                                <h2 className="font-semibold text-gray-900 leading-none">Authentic Lanka</h2>
+                                <p className="text-xs text-gray-500 mt-0.5">Exports ERP</p>
                             </div>
                         </div>
                         <button
@@ -515,32 +601,11 @@ export default function Sidebar({ isOpen, onClose }) {
 
                         {/* ── Regular menu groups ── */}
                         {visibleGroups.map((group) => (
-                            <div key={group.label}>
-                                <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400 select-none">
-                                    {group.label}
-                                </p>
-                                <div className="space-y-0.5">
-                                    {group.items.map((item) => {
-                                        const Icon = item.icon;
-                                        return (
-                                            <NavLink
-                                                key={`${item.label}-${item.path}`}
-                                                to={item.path}
-                                                className={({ isActive }) =>
-                                                    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                                        isActive
-                                                            ? 'bg-primary-50 text-primary-700'
-                                                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                                    }`
-                                                }
-                                            >
-                                                <Icon size={16} className="flex-shrink-0" />
-                                                <span className="truncate">{item.label}</span>
-                                            </NavLink>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            <MenuGroup
+                                key={group.label}
+                                group={group}
+                                searchQuery={searchQuery}
+                            />
                         ))}
 
                         {/* ── Approvals Section ── */}

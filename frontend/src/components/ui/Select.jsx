@@ -7,6 +7,7 @@ const Select = forwardRef(({
     options = [],
     placeholder = 'Select...',
     className = '',
+    children,
     ...props
 }, ref) => {
     return (
@@ -25,12 +26,16 @@ const Select = forwardRef(({
                     }`}
                 {...props}
             >
-                <option value="">{placeholder}</option>
-                {options.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                    </option>
-                ))}
+                {children ? children : (
+                    <>
+                        <option value="">{placeholder}</option>
+                        {options.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                            </option>
+                        ))}
+                    </>
+                )}
             </select>
             {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </div>

@@ -140,7 +140,11 @@ export default function ProductAutocompleteSelect({
 
     return (
         <div ref={wrapperRef} className="relative w-full">
-            {label && <label className="block text-xs font-bold text-gray-600 mb-1">{label}</label>}
+            {label && (
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {label}
+                </label>
+            )}
             <div className="relative">
                 <input
                     type="text"
@@ -153,7 +157,7 @@ export default function ProductAutocompleteSelect({
                     onFocus={() => setIsOpen(true)}
                     onBlur={handleBlur}
                     disabled={disabled}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none bg-white font-medium"
+                    className="w-full px-3 py-2 border border-gray-300 focus:border-primary-500 focus:ring-primary-200 rounded-lg text-sm focus:outline-none bg-white font-medium transition"
                 />
             </div>
             {isOpen && (

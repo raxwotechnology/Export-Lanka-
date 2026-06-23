@@ -57,7 +57,7 @@ export default function LoginPage() {
                     <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-4">
                         <Package className="w-8 h-8 text-white" />
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-900">Wholesale System</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Authentic Lanka Exports ERP</h1>
                     <p className="text-sm text-gray-600 mt-1">Manufacturing & Distribution</p>
                 </div>
 
@@ -111,7 +111,7 @@ export default function LoginPage() {
                 </Card>
 
                 <p className="text-center text-xs text-gray-500 mt-6">
-                    © 2026 Wholesale System. All rights reserved.
+                    © 2026 Authentic Lanka Exports ERP. All rights reserved.
                 </p>
             </div>
         </div>
