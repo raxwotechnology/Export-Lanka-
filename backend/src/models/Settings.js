@@ -9,6 +9,7 @@ const settingsSchema = new mongoose.Schema({
     companyAddress: String,
     companyPhone: String,
     companyEmail: String,
+    companyLogo: String,
     taxId: String,
     currency: {
         type: String,

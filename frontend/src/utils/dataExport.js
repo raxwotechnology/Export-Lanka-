@@ -69,7 +69,7 @@ export const exportToPDF = (title, columns, data, fileName = 'report', metadata 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text('AUTHENTIC LANKA EXPORTS ERP', 14, 20);
+    doc.text((metadata.companyName || 'EXPORT LANKA').toUpperCase(), 14, 20);
     
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');

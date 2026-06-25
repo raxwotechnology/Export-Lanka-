@@ -29,6 +29,7 @@ export const useReturnActions = () => {
 // Credit Notes
 export const useCreditNotes = (filters = {}) => useQuery({ queryKey: ['creditNotes', filters], queryFn: () => creditNotesApi.list(filters) });
 export const useCreditNote = (id) => useQuery({ queryKey: ['creditNote', id], queryFn: () => creditNotesApi.getById(id), enabled: !!id });
+export const useCreateCreditNote = () => { const qc = useQueryClient(); return useMutation({ mutationFn: creditNotesApi.create, onSuccess: success(qc, ['creditNotes', 'customers'], 'Credit note created'), onError }); };
 export const useApplyCreditNote = () => { const qc = useQueryClient(); return useMutation({ mutationFn: ({ id, data }) => creditNotesApi.apply(id, data), onSuccess: success(qc, ['creditNotes', 'creditNote', 'invoices', 'customers'], 'Credit applied'), onError }); };
 
 // Damages

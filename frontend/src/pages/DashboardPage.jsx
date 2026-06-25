@@ -309,7 +309,7 @@ export default function DashboardPage() {
                                                         <p className="font-bold text-gray-900">{order.customerId?.displayName || 'Walk-in'}</p>
                                                         <p className="text-[10px] text-gray-400 font-mono">{order.orderNumber} · {format(new Date(order.orderDate), 'yyyy-MM-dd')}</p>
                                                     </div>
-                                                    <span className="font-bold text-gray-700 text-right">{fmt(order.totalAmount)}</span>
+                                                    <span className="font-bold text-gray-700 text-right">{fmt(order.grandTotal)}</span>
                                                 </div>
                                             ))}
                                         </div>

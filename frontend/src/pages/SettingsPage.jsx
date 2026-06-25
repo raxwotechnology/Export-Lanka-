@@ -15,6 +15,7 @@ const settingsSchema = z.object({
     companyAddress: z.string().optional(),
     companyPhone: z.string().optional(),
     companyEmail: z.string().email('Invalid email').optional().or(z.literal('')),
+    companyLogo: z.string().optional(),
     taxId: z.string().optional(),
     currency: z.string().min(1, 'Currency required'),
     currencySymbol: z.string().min(1, 'Symbol required'),
@@ -29,7 +30,7 @@ export default function SettingsPage() {
     const { register, handleSubmit, reset, formState: { errors } } = useForm({
         resolver: zodResolver(settingsSchema),
         defaultValues: {
-            companyName: 'Authentic Lanka Exports ERP',
+            companyName: 'Export Lanka',
             currency: 'LKR',
             currencySymbol: 'Rs.',
             defaultTaxRate: 0,
@@ -68,6 +69,9 @@ export default function SettingsPage() {
                         <Input label="Tax ID / Registration" error={errors.taxId?.message} {...register('taxId')} />
                         <Input label="Email Address" type="email" error={errors.companyEmail?.message} {...register('companyEmail')} />
                         <Input label="Phone Number" error={errors.companyPhone?.message} {...register('companyPhone')} />
+                        <div className="col-span-2">
+                            <Input label="Logo Image URL" error={errors.companyLogo?.message} {...register('companyLogo')} />
+                        </div>
                         <div className="col-span-2">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Company Address</label>
                             <textarea

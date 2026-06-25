@@ -50,6 +50,7 @@ const reportGroups = [
         color: 'text-emerald-600', bg: 'bg-emerald-50',
         reports: [
             { title: 'Financial Snapshot', description: 'Revenue vs expenses, A/R + A/P aging, cash flow', path: '/reports/financial', icon: DollarSign },
+            { title: 'Net Profit (P&L) Report', description: 'Dynamic Profit & Loss report matching invoices, bills, and petty cash', path: '/reports/net-profit', icon: TrendingUp },
             { title: 'Daily P&L Master', description: 'Direct CRUD for Daily Profit & Loss records', path: '/reports/daily-pnl', icon: TrendingUp },
             { title: 'Variance & Sales Comparator', description: 'Monthly targets vs actual and growth comparator', path: '/reports/variance-comparator', icon: TrendingUp },
             { title: 'Monthly Performance Excel Exporter', description: 'Download complete Monthly Performance report (Sales, Production, Petty Cash, P&L)', isExporter: true, icon: DollarSign },

@@ -30,6 +30,7 @@ export const useSetTarget = () => {
 
 export const useVarianceReport = (params = {}) => useQuery({ queryKey: ['varianceReport', params], queryFn: () => financialReportsApi.variance(params) });
 export const useSalesComparison = (params = {}) => useQuery({ queryKey: ['salesComparison', params], queryFn: () => financialReportsApi.comparison(params) });
+export const useDynamicPnLReport = (params = {}) => useQuery({ queryKey: ['dynamicPnLReport', params], queryFn: () => financialReportsApi.pnlDynamic(params) });
 
 // HR
 export const useHeadcountReport = () => useQuery({ queryKey: ['headcountReport'], queryFn: hrReportsApi.headcount });

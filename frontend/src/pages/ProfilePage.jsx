@@ -73,8 +73,8 @@ export default function ProfilePage() {
         <div>
             <PageHeader title="My Profile" description="Update your personal information and security" />
 
-            <div className="grid grid-cols-3 gap-6">
-                <div className="col-span-2 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="col-span-1 md:col-span-2 space-y-6">
                     <Card className="p-6">
                         <div className="flex items-center gap-3 mb-6">
                             <User size={20} className="text-gray-600" />
@@ -139,7 +139,7 @@ export default function ProfilePage() {
                         <div className="space-y-3 text-sm">
                             <div>
                                 <p className="text-xs text-gray-500">Email</p>
-                                <p className="font-medium">{user?.email}</p>
+                                <p className="font-medium break-all">{user?.email}</p>
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500">Role</p>

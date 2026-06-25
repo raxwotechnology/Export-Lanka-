@@ -55,7 +55,7 @@ export default function GateScreenPage() {
                     <Shield size={28} className="text-emerald-400" />
                     <div>
                         <p className="text-white font-black text-lg tracking-wide">GATE CONTROL</p>
-                        <p className="text-white/40 text-xs">Authentic Lanka Exports — Sooriyawewa</p>
+                        <p className="text-white/40 text-xs">Export Lanka — Sooriyawewa</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">

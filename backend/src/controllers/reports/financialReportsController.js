@@ -476,3 +476,83 @@ export const getShiftWiseReport = asyncHandler(async (req, res) => {
         res.json({ success: true, data: result });
     }
 });
+
+export const getDynamicPnLReport = asyncHandler(async (req, res) => {
+    const { startDate, endDate } = req.query;
+    const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate ? new Date(endDate) : new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const [invoices, bills, pettyCash] = await Promise.all([
+        Invoice.find({
+            invoiceType: 'commercial',
+            status: { $nin: ['cancelled', 'draft'] },
+            invoiceDate: { $gte: start, $lte: end },
+            deletedAt: null
+        }),
+        Bill.find({
+            status: 'approved',
+            paymentStatus: { $ne: 'cancelled' },
+            billDate: { $gte: start, $lte: end },
+            deletedAt: null
+        }),
+        PettyCash.find({
+            transactionType: 'expense',
+            status: 'approved',
+            date: { $gte: start, $lte: end },
+            deletedAt: null
+        })
+    ]);
+
+    const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
+    const totalBills = bills.reduce((sum, b) => sum + (b.grandTotal || 0), 0);
+    const totalPettyExpenses = pettyCash.reduce((sum, pc) => sum + (pc.amount || 0), 0);
+
+    const pettyBreakdown = {
+        rawMaterial: pettyCash.reduce((s, p) => s + (p.rawMaterial_cost || p.rawMaterial_nos * p.rawMaterial_rate || 0), 0),
+        chemicals: pettyCash.reduce((s, p) => s + (p.chemicals || 0), 0),
+        transport: pettyCash.reduce((s, p) => s + (p.transport || 0), 0),
+        welfare: pettyCash.reduce((s, p) => s + (p.welfare || 0), 0),
+        fuel: pettyCash.reduce((s, p) => s + (p.fuel || 0), 0),
+        maintenance: pettyCash.reduce((s, p) => s + (p.maintenance || 0), 0),
+        stationary: pettyCash.reduce((s, p) => s + (p.stationary || 0), 0),
+        miscWages: pettyCash.reduce((s, p) => s + (p.miscWages || 0), 0),
+        wood: pettyCash.reduce((s, p) => s + (p.wood || 0), 0),
+        packingMaterials: pettyCash.reduce((s, p) => s + (p.packingMaterials || 0), 0),
+    };
+
+    const pettyBreakdownSum = Object.values(pettyBreakdown).reduce((a, b) => a + b, 0);
+    pettyBreakdown.other = Math.max(0, totalPettyExpenses - pettyBreakdownSum);
+
+    const totalExpenses = totalBills + totalPettyExpenses;
+    const netProfit = totalRevenue - totalExpenses;
+    const marginPercent = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    res.json({
+        success: true,
+        data: {
+            period: { start, end },
+            revenue: +totalRevenue.toFixed(2),
+            expenses: {
+                total: +totalExpenses.toFixed(2),
+                bills: +totalBills.toFixed(2),
+                pettyCash: +totalPettyExpenses.toFixed(2),
+                pettyBreakdown: {
+                    rawMaterial: +pettyBreakdown.rawMaterial.toFixed(2),
+                    chemicals: +pettyBreakdown.chemicals.toFixed(2),
+                    transport: +pettyBreakdown.transport.toFixed(2),
+                    welfare: +pettyBreakdown.welfare.toFixed(2),
+                    fuel: +pettyBreakdown.fuel.toFixed(2),
+                    maintenance: +pettyBreakdown.maintenance.toFixed(2),
+                    stationary: +pettyBreakdown.stationary.toFixed(2),
+                    miscWages: +pettyBreakdown.miscWages.toFixed(2),
+                    wood: +pettyBreakdown.wood.toFixed(2),
+                    packingMaterials: +pettyBreakdown.packingMaterials.toFixed(2),
+                    other: +pettyBreakdown.other.toFixed(2)
+                }
+            },
+            netProfit: +netProfit.toFixed(2),
+            marginPercent: +marginPercent.toFixed(2)
+        }
+    });
+});

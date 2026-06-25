@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import api from '../api/axios';
 import { exportToExcel, exportToPDF, exportToCSV } from '../utils/dataExport';
 import { useAuthStore } from '../store/authStore';
+import { useSettings } from '../features/settings/useSettings';
 
 /**
  * useExport hook
@@ -9,6 +10,8 @@ import { useAuthStore } from '../store/authStore';
  */
 export const useExport = ({ title, columns, fileName, module }) => {
     const { user } = useAuthStore();
+    const { data: settingsData } = useSettings();
+    const settings = settingsData?.data;
 
     const generateFileName = useCallback((ext) => {
         const date = new Date().toISOString().slice(0, 10);
@@ -98,10 +101,11 @@ export const useExport = ({ title, columns, fileName, module }) => {
             generateFileName('pdf').replace('.pdf', ''),
             {
                 userName: `${user?.firstName} ${user?.lastName}`,
-                userRole: user?.role
+                userRole: user?.role,
+                companyName: settings?.companyName
             }
         );
-    }, [columns, generateFileName, module, title, user]);
+    }, [columns, generateFileName, module, title, user, settings]);
 
     return {
         handleExportExcel,

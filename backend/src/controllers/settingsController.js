@@ -7,7 +7,7 @@ import Settings from '../models/Settings.js';
 export const getSettings = asyncHandler(async (req, res) => {
     let settings = await Settings.findOne();
     if (!settings) {
-        settings = await Settings.create({ companyName: 'Wholesale ERP' });
+        settings = await Settings.create({ companyName: 'Export Lanka' });
     }
     res.json({ success: true, data: settings });
 });

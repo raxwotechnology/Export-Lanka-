@@ -26,6 +26,7 @@ import {
     getVarianceReport,
     getSalesComparison,
     getShiftWiseReport,
+    getDynamicPnLReport,
 } from '../controllers/reports/financialReportsController.js';
 import {
     getHeadcountReport, getAttendanceReport, getLeavePatternsReport, getPayrollSummaryReport,
@@ -50,6 +51,7 @@ router.get('/financial/targets', requirePermission('reports.financial'), getTarg
 router.post('/financial/targets', requirePermission('reports.financial'), setTarget);
 router.get('/financial/variance', requirePermission('reports.financial'), getVarianceReport);
 router.get('/financial/comparison', requirePermission('reports.financial'), getSalesComparison);
+router.get('/financial/pnl-dynamic', requirePermission('reports.financial'), getDynamicPnLReport);
 router.get('/pnl/records', requirePermission('reports.financial'), getPnLRecords);
 router.post('/pnl/records', requirePermission('reports.financial'), createPnLRecord);
 router.put('/pnl/records/:id', requirePermission('reports.financial'), updatePnLRecord);

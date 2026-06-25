@@ -39,6 +39,7 @@ export const financialReportsApi = {
     setTarget: async (data) => (await api.post('/reports/financial/targets', data)).data,
     variance: async (params = {}) => (await api.get('/reports/financial/variance', { params })).data,
     comparison: async (params = {}) => (await api.get('/reports/financial/comparison', { params })).data,
+    pnlDynamic: async (params = {}) => (await api.get('/reports/financial/pnl-dynamic', { params })).data,
 };
 
 export const hrReportsApi = {

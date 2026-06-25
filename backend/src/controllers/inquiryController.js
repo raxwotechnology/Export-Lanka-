@@ -30,7 +30,7 @@ export const getInquiries = asyncHandler(async (req, res) => {
 
     const [inquiries, total] = await Promise.all([
         Inquiry.find(filter)
-            .populate('interestedProducts', 'name productCode')
+            .populate('products.product', 'name productCode')
             .populate('assignedTo', 'firstName lastName')
             .sort({ createdAt: -1 })
             .skip(skip)

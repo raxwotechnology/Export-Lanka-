@@ -8,6 +8,9 @@ const quotationSchema = new mongoose.Schema({
     // customerId can reference either Customer or be provided as a string name
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', set: v => v === '' ? undefined : v },
     customerName: { type: String },
+    customerEmail: { type: String },
+    customerPhone: { type: String },
+    customerAddress: { type: String },
     version: { type: Number, default: 1 },
     items: [{
         product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },

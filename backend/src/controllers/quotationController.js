@@ -13,6 +13,33 @@ export const createQuotation = asyncHandler(async (req, res) => {
     if (req.body.inquiryId === '') delete req.body.inquiryId;
     if (req.body.inquiry === '') delete req.body.inquiry;
 
+    // Auto-register unregistered customer if customerName is provided but customerId is not
+    if (!req.body.customerId && req.body.customerName) {
+        const { default: Customer } = await import('../models/Customer.js');
+        let customer = await Customer.findOne({
+            displayName: { $regex: new RegExp('^' + req.body.customerName.trim() + '$', 'i') }
+        });
+        if (!customer) {
+            customer = new Customer({
+                displayName: req.body.customerName.trim(),
+                companyName: req.body.customerName.trim(),
+                primaryContact: {
+                    email: req.body.customerEmail || undefined,
+                    phone: req.body.customerPhone || undefined
+                },
+                billingAddress: req.body.customerAddress ? {
+                    line1: req.body.customerAddress,
+                    city: '',
+                    country: 'Sri Lanka'
+                } : undefined,
+                status: 'active',
+                createdBy: req.user._id
+            });
+            await customer.save();
+        }
+        req.body.customerId = customer._id;
+    }
+
     const quotation = await Quotation.create({
         ...req.body,
         createdBy: req.user._id,
@@ -95,6 +122,33 @@ export const updateQuotation = asyncHandler(async (req, res) => {
     if (req.body.customerId === '') delete req.body.customerId;
     if (req.body.inquiryId === '') delete req.body.inquiryId;
     if (req.body.inquiry === '') delete req.body.inquiry;
+
+    // Auto-register unregistered customer if customerName is provided but customerId is not
+    if (!req.body.customerId && req.body.customerName) {
+        const { default: Customer } = await import('../models/Customer.js');
+        let customer = await Customer.findOne({
+            displayName: { $regex: new RegExp('^' + req.body.customerName.trim() + '$', 'i') }
+        });
+        if (!customer) {
+            customer = new Customer({
+                displayName: req.body.customerName.trim(),
+                companyName: req.body.customerName.trim(),
+                primaryContact: {
+                    email: req.body.customerEmail || undefined,
+                    phone: req.body.customerPhone || undefined
+                },
+                billingAddress: req.body.customerAddress ? {
+                    line1: req.body.customerAddress,
+                    city: '',
+                    country: 'Sri Lanka'
+                } : undefined,
+                status: 'active',
+                createdBy: req.user._id
+            });
+            await customer.save();
+        }
+        req.body.customerId = customer._id;
+    }
 
     const quotation = await Quotation.findByIdAndUpdate(
         req.params.id,

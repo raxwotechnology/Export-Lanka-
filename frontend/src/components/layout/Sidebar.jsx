@@ -11,6 +11,7 @@ import {
     Plus, ArrowLeftRight, Sliders, LineChart, PieChart, TrendingUp, UserCheck
 } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
+import { useSettings } from '../../features/settings/useSettings';
 
 // ── Regular grouped menu structure ─────────────────────────────────────────
 const menuGroups = [
@@ -397,6 +398,8 @@ function MenuGroup({ group, searchQuery }) {
 export default function Sidebar({ isOpen, onClose }) {
     const sidebarRef = useRef(null);
     const { hasPermission, hasAnyPermission, isAdmin, user } = usePermission();
+    const { data: settingsData } = useSettings();
+    const settings = settingsData?.data;
 
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -512,12 +515,24 @@ export default function Sidebar({ isOpen, onClose }) {
                     {/* ── Logo / Brand ── */}
                     <div className="p-5 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <Package className="w-5 h-5 text-white" />
-                            </div>
+                            {settings?.companyLogo ? (
+                                <img
+                                    src={settings.companyLogo}
+                                    className="w-9 h-9 object-contain rounded-lg flex-shrink-0 border border-gray-100 p-0.5"
+                                    alt="Logo"
+                                />
+                            ) : (
+                                <div className="w-9 h-9 bg-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <Package className="w-5 h-5 text-white" />
+                                </div>
+                            )}
                             <div>
-                                <h2 className="font-semibold text-gray-900 leading-none">Authentic Lanka</h2>
-                                <p className="text-xs text-gray-500 mt-0.5">Exports ERP</p>
+                                <h2 className="font-semibold text-gray-900 leading-none truncate max-w-[145px]" title={settings?.companyName || 'Export Lanka'}>
+                                    {settings?.companyName || 'Export Lanka'}
+                                </h2>
+                                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[145px]" title={settings?.companyPhone || 'Exports ERP'}>
+                                    {settings?.companyPhone || 'Exports ERP'}
+                                </p>
                             </div>
                         </div>
                         <button

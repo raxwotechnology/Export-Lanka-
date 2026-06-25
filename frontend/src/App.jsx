@@ -107,6 +107,7 @@ import ProductionReportPage from './pages/reports/ProductionReportPage';
 import YieldForecasterPage from './pages/reports/YieldForecasterPage';
 import ReturnsReportPage from './pages/reports/ReturnsReportPage';
 import FinancialSnapshotPage from './pages/reports/FinancialSnapshotPage';
+import NetProfitReportPage from './pages/reports/NetProfitReportPage';
 import HrReportsPage from './pages/reports/HrReportsPage';
 import VarianceComparisonPage from './pages/reports/VarianceComparisonPage';
 import ShiftReportingPage from './pages/reports/ShiftReportingPage';
@@ -236,6 +237,7 @@ function App() {
         <Route path="/reports/yield-forecaster" element={<ProtectedRoute requiredPermission="reports.production"><YieldForecasterPage /></ProtectedRoute>} />
         <Route path="/reports/returns-damages" element={<ProtectedRoute requiredPermission="reports.sales"><ReturnsReportPage /></ProtectedRoute>} />
         <Route path="/reports/financial" element={<ProtectedRoute requiredPermission="reports.financial"><FinancialSnapshotPage /></ProtectedRoute>} />
+        <Route path="/reports/net-profit" element={<ProtectedRoute requiredPermission="reports.financial"><NetProfitReportPage /></ProtectedRoute>} />
         <Route path="/reports/daily-pnl" element={<ProtectedRoute requiredPermission="reports.financial"><DailyPnLPage /></ProtectedRoute>} />
         <Route path="/reports/variance-comparator" element={<ProtectedRoute requiredPermission="reports.financial"><VarianceComparisonPage /></ProtectedRoute>} />
         <Route path="/reports/hr" element={<ProtectedRoute requiredPermission="reports.hr"><HrReportsPage /></ProtectedRoute>} />
