@@ -122,6 +122,7 @@ const menuGroups = [
             { label: 'Attendance', icon: CalendarIcon, path: '/attendance', permission: 'hr.attendance.view' },
             { label: 'Employee of Month', icon: Award, path: '/employees/month', permission: 'hr.employees.view' },
             { label: 'Leave Requests', icon: Plane, path: '/leaves', permission: 'hr.leaves.view' },
+            { label: 'Leave Structures', icon: CalendarIcon, path: '/leave-structures', permission: 'hr.leaves.view' },
             { label: 'Holidays', icon: CalendarIcon, path: '/holidays', permission: 'hr.employees.view' },
             { label: 'Salary Structures', icon: Calculator, path: '/salary-structures', permission: 'hr.salary.view' },
             { label: 'Payroll', icon: DollarSign, path: '/payroll', permission: 'hr.payroll.view' },

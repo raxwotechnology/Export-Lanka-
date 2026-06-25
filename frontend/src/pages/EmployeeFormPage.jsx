@@ -11,7 +11,7 @@ import Select from '../components/ui/Select';
 import Textarea from '../components/ui/Textarea';
 import {
     useEmployee, useCreateEmployee, useUpdateEmployee,
-    useDepartments, useDesignations, useShifts, useSalaryStructures,
+    useDepartments, useDesignations, useShifts, useSalaryStructures, useLeaveStructures,
 } from '../features/hr/useHr';
 
 const tabs = [
@@ -35,6 +35,7 @@ export default function EmployeeFormPage() {
     const { data: designationsData } = useDesignations();
     const { data: shiftsData } = useShifts();
     const { data: structuresData } = useSalaryStructures({ isActive: 'true' });
+    const { data: leavesData } = useLeaveStructures({ isActive: 'true' });
 
     const [form, setForm] = useState({
         firstName: '', lastName: '', gender: '', dateOfBirth: '', nationalIdNumber: '',
@@ -48,7 +49,7 @@ export default function EmployeeFormPage() {
         workLocation: '', workShift: '',
         epfNumber: '', etfNumber: '', taxRegistrationNumber: '',
         bankDetails: { bankName: '', branchName: '', accountNumber: '', accountName: '' },
-        salaryStructureId: '', basicSalary: 0,
+        salaryStructureId: '', leaveStructureId: '', basicSalary: 0,
         status: 'active',
         notes: '',
         employeeCategory: 'Permanent',
@@ -82,6 +83,7 @@ export default function EmployeeFormPage() {
                 taxRegistrationNumber: e.taxRegistrationNumber || '',
                 bankDetails: e.bankDetails || { bankName: '', branchName: '', accountNumber: '', accountName: '' },
                 salaryStructureId: e.salaryStructureId?._id || '',
+                leaveStructureId: e.leaveStructureId?._id || '',
                 basicSalary: e.basicSalary || 0,
                 status: e.status || 'active',
                 notes: e.notes || '',
@@ -121,6 +123,7 @@ export default function EmployeeFormPage() {
                 reportsToId: form.reportsToId || undefined,
                 workShift: form.workShift || undefined,
                 salaryStructureId: form.salaryStructureId || undefined,
+                leaveStructureId: form.leaveStructureId || undefined,
             };
             if (isEdit) {
                 await updateMutation.mutateAsync({ id, data: payload });
@@ -136,6 +139,7 @@ export default function EmployeeFormPage() {
     const designationOptions = (designationsData?.data || []).map((d) => ({ value: d._id, label: d.name }));
     const shiftOptions = (shiftsData?.data || []).map((s) => ({ value: s._id, label: s.name }));
     const structureOptions = (structuresData?.data || []).map((s) => ({ value: s._id, label: s.name }));
+    const leaveStructureOptions = (leavesData?.data || []).map((l) => ({ value: l._id, label: l.name }));
 
     return (
         <div>
@@ -307,8 +311,12 @@ export default function EmployeeFormPage() {
                                 <Input label="Automated OT Cutoff (Hours/month)" type="number" min="0"
                                     value={form.otCutoffHours} onChange={(e) => update('otCutoffHours', Number(e.target.value))} />
                             </div>
-                            <Select label="Salary Structure" placeholder="None (use basic only)" options={structureOptions}
-                                value={form.salaryStructureId} onChange={(e) => update('salaryStructureId', e.target.value)} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <Select label="Salary Structure" placeholder="None (use basic only)" options={structureOptions}
+                                    value={form.salaryStructureId} onChange={(e) => update('salaryStructureId', e.target.value)} />
+                                <Select label="Leave Structure" placeholder="None (use default standard balances)" options={leaveStructureOptions}
+                                    value={form.leaveStructureId} onChange={(e) => update('leaveStructureId', e.target.value)} />
+                            </div>
                             <Input label="Basic Salary (LKR/month)" type="number" step="0.01" min="0"
                                 value={form.basicSalary} onChange={(e) => update('basicSalary', e.target.value)} />
                             <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-900 mt-2">

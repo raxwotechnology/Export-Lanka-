@@ -17,6 +17,7 @@ export const designationsApi = {
 export const employeesApi = {
     list: async (params = {}) => (await api.get('/hr/employees', { params })).data,
     getById: async (id) => (await api.get(`/hr/employees/${id}`)).data,
+    getMyProfile: async () => (await api.get('/hr/employees/me')).data,
     create: async (data) => (await api.post('/hr/employees', data)).data,
     update: async (id, data) => (await api.put(`/hr/employees/${id}`, data)).data,
     delete: async (id) => (await api.delete(`/hr/employees/${id}`)).data,
@@ -43,6 +44,13 @@ export const leavesApi = {
     cancel: async (id) => (await api.patch(`/hr/leaves/${id}/cancel`)).data,
 };
 
+export const leaveStructuresApi = {
+    list: async (params = {}) => (await api.get('/hr/leave-structures', { params })).data,
+    create: async (data) => (await api.post('/hr/leave-structures', data)).data,
+    update: async (id, data) => (await api.put(`/hr/leave-structures/${id}`, data)).data,
+    delete: async (id) => (await api.delete(`/hr/leave-structures/${id}`)).data,
+};
+
 export const holidaysApi = {
     list: async (params = {}) => (await api.get('/hr/holidays', { params })).data,
     create: async (data) => (await api.post('/hr/holidays', data)).data,
@@ -65,4 +73,5 @@ export const payrollApi = {
     approve: async (id) => (await api.patch(`/payroll/${id}/approve`)).data,
     markPaid: async (id) => (await api.patch(`/payroll/${id}/mark-paid`)).data,
     getPayslip: async (payrollId, employeeId) => (await api.get(`/payroll/${payrollId}/payslip/${employeeId}`)).data,
+    getMyPayslips: async () => (await api.get('/payroll/my-payslips')).data,
 };

@@ -8,6 +8,7 @@ import {
     createLeaveRequest, getLeaveRequests, approveLeaveRequest, rejectLeaveRequest, cancelLeaveRequest,
     createHoliday, getHolidays, updateHoliday, deleteHoliday,
     createSalaryStructure, getSalaryStructures, updateSalaryStructure, deleteSalaryStructure,
+    createLeaveStructure, getLeaveStructures, updateLeaveStructure, deleteLeaveStructure, getMyEmployeeProfile,
 } from '../controllers/hrController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
@@ -40,6 +41,8 @@ router.route('/designations/:id')
 router.route('/employees')
     .get(requirePermission('hr.employees.view'), getEmployees)
     .post(requirePermission('hr.employees.manage'), createEmployee);
+
+router.get('/employees/me', getMyEmployeeProfile);
 
 router.route('/employees/:id')
     .get(requirePermission('hr.employees.view'), getEmployeeById)
@@ -88,6 +91,15 @@ router.route('/salary-structures')
 router.route('/salary-structures/:id')
     .put(requirePermission('hr.salary.manage'), updateSalaryStructure)
     .delete(requirePermission('hr.salary.manage'), deleteSalaryStructure);
+
+// ── Leave Structures ───────────────────────────────────────────────────────────
+router.route('/leave-structures')
+    .get(requirePermission('hr.leaves.view'), getLeaveStructures)
+    .post(requirePermission('hr.leaves.manage'), createLeaveStructure);
+
+router.route('/leave-structures/:id')
+    .put(requirePermission('hr.leaves.manage'), updateLeaveStructure)
+    .delete(requirePermission('hr.leaves.manage'), deleteLeaveStructure);
 
 // ── Employee of the Month ─────────────────────────────────────────────────────
 /**

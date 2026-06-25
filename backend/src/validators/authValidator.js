@@ -12,8 +12,10 @@ export const registerSchema = z.object({
         .regex(/[0-9]/, 'Password must contain at least one number'),
     role: z.enum([
         'admin', 'manager', 'accountant', 'sales_manager',
-        'sales_rep', 'warehouse_staff', 'production_staff', 'staff'
+        'sales_rep', 'warehouse_staff', 'production_staff', 'staff', 'employee'
     ]).optional(),
+    designationId: z.string().optional(),
+    departmentId: z.string().optional(),
 });
 
 export const loginSchema = z.object({

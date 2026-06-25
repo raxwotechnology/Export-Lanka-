@@ -6,7 +6,7 @@ import {
     DollarSign, ShoppingCart, TrendingUp, AlertTriangle,
     Package, Factory, FileText, Users, CreditCard, ArrowRight,
     Camera, RefreshCw, Layers, ShieldCheck, Wallet, Landmark,
-    Calendar, CheckCircle, Clock, Home, Workflow
+    Calendar, CheckCircle, Clock, Home, Workflow, Plus
 } from 'lucide-react';
 import {
     LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -19,16 +19,28 @@ import Card from '../components/ui/Card';
 import KpiCard from '../components/ui/KpiCard';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import Input from '../components/ui/Input';
+import Textarea from '../components/ui/Textarea';
+import Modal from '../components/ui/Modal';
+import Select from '../components/ui/Select';
 import api from '../api/axios';
 import { useDashboardKpis, useRevenueChart } from '../features/reports/useReports';
 import { useSocket } from '../hooks/useSocket';
+import { useAuthStore } from '../store/authStore';
+import { useMyProfile, useMyPayslips, useLeaves, useAttendance, useCreateLeave } from '../features/hr/useHr';
 import toast from 'react-hot-toast';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 export default function DashboardPage() {
+    const { user } = useAuthStore();
     const navigate = useNavigate();
     const qc = useQueryClient();
+
+    if (user?.role === 'employee') {
+        return <EmployeeDashboard />;
+    }
+
     const { data: kpisData, isLoading: kpisLoading } = useDashboardKpis();
     const { data: revenueData } = useRevenueChart(6);
     const { socket } = useSocket();
@@ -620,6 +632,236 @@ export default function DashboardPage() {
                     </>
                 )}
             </div>
+        </div>
+    );
+}
+
+function EmployeeDashboard() {
+    const { data: profileRes, isLoading: profileLoading } = useMyProfile();
+    const profile = profileRes?.data;
+
+    const { data: leavesRes } = useLeaves(
+        profile ? { employeeId: profile._id, limit: 10 } : { enabled: false }
+    );
+    const { data: attendanceRes } = useAttendance(
+        profile ? { employeeId: profile._id, limit: 31 } : { enabled: false }
+    );
+    const { data: payslipsRes } = useMyPayslips();
+
+    const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+    const createLeaveM = useCreateLeave();
+
+    const [form, setForm] = useState({
+        employeeId: '', leaveType: 'annual', fromDate: '', toDate: '',
+        isHalfDay: false, reason: '',
+    });
+
+    useEffect(() => {
+        if (profile) {
+            setForm((f) => ({ ...f, employeeId: profile._id }));
+        }
+    }, [profile]);
+
+    const submitLeave = async () => {
+        if (!form.fromDate || !form.toDate || !form.reason) {
+            toast.error('All fields required'); return;
+        }
+        try {
+            await createLeaveM.mutateAsync(form);
+            setIsLeaveModalOpen(false);
+            setForm({ employeeId: profile._id, leaveType: 'annual', fromDate: '', toDate: '', isHalfDay: false, reason: '' });
+        } catch { }
+    };
+
+    if (profileLoading) return <div className="py-16 text-center text-gray-500 font-sans">Loading employee portal...</div>;
+    if (!profile) return <div className="py-16 text-center text-red-500 font-sans font-bold">No employee profile linked to this account. Contact HR.</div>;
+
+    const leaves = leavesRes?.data || [];
+    const attendance = attendanceRes?.data || [];
+    const payslips = payslipsRes?.data || [];
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayAtt = attendance.find(a => new Date(a.date).toISOString().slice(0, 10) === todayStr);
+
+    const fmt = (n) => new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 0 }).format(n || 0);
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-gradient-to-r from-primary-600 to-indigo-750 text-white p-6 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 className="text-xl md:text-2xl font-bold">Welcome back, {profile.firstName}!</h2>
+                    <p className="text-primary-100 text-sm mt-1">{profile.designationId?.name || 'Staff'} • {profile.departmentId?.name || 'General'}</p>
+                    <p className="text-primary-200 text-xs mt-1">Employee ID: {profile.employeeCode}</p>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="secondary" onClick={() => setIsLeaveModalOpen(true)}>
+                        <Plus size={16} className="mr-1.5" /> Request Leave
+                    </Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="p-5 md:col-span-2">
+                    <h3 className="text-sm font-semibold mb-4 text-gray-700">My Leave Balances (Remaining)</h3>
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-blue-50 border border-blue-100 p-3.5 rounded-xl text-center">
+                            <span className="text-2xl font-bold text-blue-700 block">{profile.leaveBalances?.annual || 0}</span>
+                            <span className="text-[10px] text-blue-600 font-medium uppercase tracking-wider">Annual</span>
+                        </div>
+                        <div className="bg-green-50 border border-green-100 p-3.5 rounded-xl text-center">
+                            <span className="text-2xl font-bold text-green-700 block">{profile.leaveBalances?.casual || 0}</span>
+                            <span className="text-[10px] text-green-600 font-medium uppercase tracking-wider">Casual</span>
+                        </div>
+                        <div className="bg-yellow-50 border border-yellow-100 p-3.5 rounded-xl text-center">
+                            <span className="text-2xl font-bold text-yellow-700 block">{profile.leaveBalances?.sick || 0}</span>
+                            <span className="text-[10px] text-yellow-600 font-medium uppercase tracking-wider">Sick</span>
+                        </div>
+                    </div>
+                </Card>
+
+                <Card className="p-5 flex flex-col justify-between">
+                    <div>
+                        <h3 className="text-sm font-semibold mb-2 text-gray-700">Today's Attendance</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                            <Clock size={16} className="text-primary-600 animate-pulse" />
+                            <span className="text-xs font-semibold text-gray-500">Active Shift: {profile.workShift?.name || 'Not assigned'}</span>
+                        </div>
+                    </div>
+                    <div className="mt-4 py-3 bg-gray-50 border border-gray-100 rounded-xl px-4 flex justify-between text-xs">
+                        <div>
+                            <span className="text-[10px] text-gray-400 font-bold block uppercase">In</span>
+                            <span className="font-semibold text-gray-700">{todayAtt?.checkInTime ? new Date(todayAtt.checkInTime).toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+                        </div>
+                        <div className="border-l border-gray-200"></div>
+                        <div>
+                            <span className="text-[10px] text-gray-400 font-bold block uppercase">Out</span>
+                            <span className="font-semibold text-gray-700">{todayAtt?.checkOutTime ? new Date(todayAtt.checkOutTime).toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+                        </div>
+                        <div className="border-l border-gray-200"></div>
+                        <div>
+                            <span className="text-[10px] text-gray-400 font-bold block uppercase">Status</span>
+                            <span className="font-semibold text-gray-700 capitalize">{todayAtt?.status || 'Not marked'}</span>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="p-5">
+                    <div className="flex justify-between items-center mb-4 border-b pb-3">
+                        <h3 className="text-sm font-semibold text-gray-800">My Leave Requests</h3>
+                    </div>
+                    {leaves.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400 text-xs">No leave requests found.</div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="text-gray-400 border-b pb-2">
+                                        <th className="pb-2">Dates</th>
+                                        <th className="pb-2">Type</th>
+                                        <th className="pb-2">Days</th>
+                                        <th className="pb-2 text-right">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {leaves.map((l) => (
+                                        <tr key={l._id} className="border-b last:border-0 hover:bg-gray-50 transition">
+                                            <td className="py-2.5 font-medium text-gray-800">
+                                                {new Date(l.fromDate).toLocaleDateString('en-LK')} — {new Date(l.toDate).toLocaleDateString('en-LK')}
+                                            </td>
+                                            <td className="py-2.5 capitalize">{l.leaveType}</td>
+                                            <td className="py-2.5">{l.numberOfDays}</td>
+                                            <td className="py-2.5 text-right">
+                                                <Badge variant={l.status === 'approved' ? 'success' : l.status === 'pending' ? 'warning' : 'danger'}>{l.status}</Badge>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </Card>
+
+                <Card className="p-5">
+                    <div className="flex justify-between items-center mb-4 border-b pb-3">
+                        <h3 className="text-sm font-semibold text-gray-800">My Payslips</h3>
+                    </div>
+                    {payslips.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400 text-xs">No approved payslips found yet.</div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="text-gray-400 border-b pb-2">
+                                        <th className="pb-2">Period</th>
+                                        <th className="pb-2">Net Pay</th>
+                                        <th className="pb-2">Status</th>
+                                        <th className="pb-2 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {payslips.map((p) => (
+                                        <tr key={p._id} className="border-b last:border-0 hover:bg-gray-50 transition">
+                                            <td className="py-2.5 font-medium text-gray-800">
+                                                {new Date(p.periodStartDate).toLocaleDateString('en-LK', { month: 'long', year: 'numeric' })}
+                                            </td>
+                                            <td className="py-2.5 font-bold text-gray-750">{fmt(p.netPay)}</td>
+                                            <td className="py-2.5 capitalize">
+                                                <Badge variant={p.paymentStatus === 'paid' ? 'success' : 'warning'}>{p.paymentStatus}</Badge>
+                                            </td>
+                                            <td className="py-2.5 text-right">
+                                                <button
+                                                    onClick={() => window.open(`/payroll/${p.payrollId}/payslip/${p.employeeId}`, '_blank')}
+                                                    className="text-primary-600 hover:text-primary-800 font-semibold"
+                                                >
+                                                    View Payslip
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </Card>
+            </div>
+
+            <Modal isOpen={isLeaveModalOpen} onClose={() => setIsLeaveModalOpen(false)} title="New Leave Request" size="md">
+                <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <Select label="Leave Type"
+                            options={[
+                                { value: 'annual', label: 'Annual' },
+                                { value: 'sick', label: 'Sick' },
+                                { value: 'casual', label: 'Casual' },
+                                { value: 'maternity', label: 'Maternity' },
+                                { value: 'paternity', label: 'Paternity' },
+                                { value: 'unpaid', label: 'Unpaid' },
+                            ]}
+                            value={form.leaveType} onChange={(e) => setForm((f) => ({ ...f, leaveType: e.target.value }))} />
+                        <div className="flex items-end pb-2">
+                            <label className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={form.isHalfDay}
+                                    onChange={(e) => setForm((f) => ({ ...f, isHalfDay: e.target.checked }))} />
+                                Half day
+                            </label>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input label="From Date" required type="date" value={form.fromDate}
+                            onChange={(e) => setForm((f) => ({ ...f, fromDate: e.target.value }))} />
+                        <Input label="To Date" required type="date" value={form.toDate}
+                            onChange={(e) => setForm((f) => ({ ...f, toDate: e.target.value }))} />
+                    </div>
+                    <Textarea label="Reason" required rows={3} value={form.reason}
+                        onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))} />
+                </div>
+                <div className="flex justify-end gap-2 px-6 py-4 border-t bg-gray-50">
+                    <Button variant="outline" onClick={() => setIsLeaveModalOpen(false)}>Cancel</Button>
+                    <Button variant="primary" onClick={submitLeave} loading={createLeaveM.isPending}>Submit</Button>
+                </div>
+            </Modal>
         </div>
     );
 }

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
     departmentsApi, designationsApi, employeesApi, shiftsApi,
-    attendanceApi, leavesApi, holidaysApi, salaryStructuresApi, payrollApi,
+    attendanceApi, leavesApi, holidaysApi, salaryStructuresApi, payrollApi, leaveStructuresApi,
 } from './hrApi';
 
 const onErr = (err) => toast.error(err.response?.data?.message || 'Failed');
@@ -78,3 +78,13 @@ export const usePayslip = (payrollId, employeeId) => useQuery({
     queryFn: () => payrollApi.getPayslip(payrollId, employeeId),
     enabled: !!payrollId && !!employeeId,
 });
+
+// Leave Structures
+export const useLeaveStructures = (filters = {}) => useQuery({ queryKey: ['leaveStructures', filters], queryFn: () => leaveStructuresApi.list(filters) });
+export const useCreateLeaveStructure = () => { const qc = useQueryClient(); return useMutation({ mutationFn: leaveStructuresApi.create, onSuccess: () => { invalidate(qc, ['leaveStructures'])(); toast.success('Created'); }, onError: onErr }); };
+export const useUpdateLeaveStructure = () => { const qc = useQueryClient(); return useMutation({ mutationFn: ({ id, data }) => leaveStructuresApi.update(id, data), onSuccess: () => { invalidate(qc, ['leaveStructures'])(); toast.success('Updated'); }, onError: onErr }); };
+export const useDeleteLeaveStructure = () => { const qc = useQueryClient(); return useMutation({ mutationFn: leaveStructuresApi.delete, onSuccess: () => { invalidate(qc, ['leaveStructures'])(); toast.success('Deleted'); }, onError: onErr }); };
+
+// Self-Service hooks
+export const useMyProfile = () => useQuery({ queryKey: ['myProfile'], queryFn: employeesApi.getMyProfile });
+export const useMyPayslips = () => useQuery({ queryKey: ['myPayslips'], queryFn: payrollApi.getMyPayslips });

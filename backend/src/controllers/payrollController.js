@@ -327,3 +327,36 @@ export const previewPayslip = asyncHandler(async (req, res) => {
         data: { employee: emp, workingDays, attendance, calculation: calc },
     });
 });
+
+export const getMyPayslips = asyncHandler(async (req, res) => {
+    const Employee = (await import('../models/Employee.js')).default;
+    const Payroll = (await import('../models/Payroll.js')).default;
+
+    const emp = await Employee.findOne({ userId: req.user._id });
+    if (!emp) {
+        res.status(404);
+        throw new Error('Employee profile not found for this user');
+    }
+
+    const payrolls = await Payroll.find({ 'payslips.employeeId': emp._id, status: 'approved' })
+        .select('payrollNumber periodMonth periodYear periodStartDate periodEndDate payslips.$');
+
+    const payslips = payrolls.map(p => {
+        const ps = p.payslips[0];
+        return {
+            payrollId: p._id,
+            payrollNumber: p.payrollNumber,
+            periodMonth: p.periodMonth,
+            periodYear: p.periodYear,
+            periodStartDate: p.periodStartDate,
+            periodEndDate: p.periodEndDate,
+            netPay: ps.netPay,
+            paymentStatus: ps.paymentStatus,
+            paidAt: ps.paidAt,
+            _id: ps._id,
+            employeeId: emp._id,
+        };
+    });
+
+    res.json({ success: true, count: payslips.length, data: payslips });
+});

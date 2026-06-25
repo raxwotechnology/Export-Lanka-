@@ -47,6 +47,25 @@ export const register = asyncHandler(async (req, res) => {
     });
 
     if (user) {
+        if (req.body.designationId) {
+            const Employee = (await import('../models/Employee.js')).default;
+            const Designation = (await import('../models/Designation.js')).default;
+            const des = await Designation.findById(req.body.designationId);
+            const deptId = des ? des.departmentId : undefined;
+
+            await Employee.create({
+                userId: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phone: user.phone,
+                designationId: req.body.designationId,
+                departmentId: deptId,
+                createdBy: req.user?._id,
+                dateOfJoining: new Date(),
+            });
+        }
+
         res.status(201).json({
             success: true,
             message: isFirstUser

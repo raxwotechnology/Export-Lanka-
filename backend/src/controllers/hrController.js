@@ -7,6 +7,7 @@ import Attendance from '../models/Attendance.js';
 import LeaveRequest from '../models/LeaveRequest.js';
 import Holiday from '../models/Holiday.js';
 import SalaryStructure from '../models/SalaryStructure.js';
+import LeaveStructure from '../models/LeaveStructure.js';
 
 // ============================================================
 // DEPARTMENTS
@@ -85,13 +86,18 @@ export const deleteDesignation = asyncHandler(async (req, res) => {
 // ============================================================
 
 export const createEmployee = asyncHandler(async (req, res) => {
+    if (req.body.leaveStructureId) {
+        const ls = await LeaveStructure.findById(req.body.leaveStructureId);
+        if (ls) req.body.leaveBalances = ls.leaveBalances;
+    }
     const emp = new Employee({ ...req.body, createdBy: req.user._id });
     await emp.save();
 
     const populated = await Employee.findById(emp._id)
         .populate('departmentId', 'name code')
         .populate('designationId', 'name code')
-        .populate('reportsToId', 'firstName lastName employeeCode');
+        .populate('reportsToId', 'firstName lastName employeeCode')
+        .populate('leaveStructureId', 'name code leaveBalances');
 
     res.status(201).json({ success: true, data: populated });
 });
@@ -144,12 +150,17 @@ export const getEmployeeById = asyncHandler(async (req, res) => {
         .populate('reportsToId', 'firstName lastName employeeCode')
         .populate('userId', 'email role isActive')
         .populate('workShift', 'name startTime endTime')
-        .populate('salaryStructureId', 'name code components');
+        .populate('salaryStructureId', 'name code components')
+        .populate('leaveStructureId', 'name code leaveBalances');
     if (!emp) { res.status(404); throw new Error('Employee not found'); }
     res.json({ success: true, data: emp });
 });
 
 export const updateEmployee = asyncHandler(async (req, res) => {
+    if (req.body.leaveStructureId) {
+        const ls = await LeaveStructure.findById(req.body.leaveStructureId);
+        if (ls) req.body.leaveBalances = ls.leaveBalances;
+    }
     const emp = await Employee.findByIdAndUpdate(
         req.params.id,
         { ...req.body, updatedBy: req.user._id },
@@ -551,4 +562,48 @@ export const deleteSalaryStructure = asyncHandler(async (req, res) => {
     if (!s) { res.status(404); throw new Error('Salary structure not found'); }
     s.deletedAt = new Date(); s.isActive = false; await s.save();
     res.json({ success: true });
+});
+
+// ============================================================
+// LEAVE STRUCTURES & PROFILE SELF-SERVICE
+// ============================================================
+
+export const createLeaveStructure = asyncHandler(async (req, res) => {
+    const s = await LeaveStructure.create(req.body);
+    res.status(201).json({ success: true, data: s });
+});
+
+export const getLeaveStructures = asyncHandler(async (req, res) => {
+    const { isActive } = req.query;
+    const filter = {};
+    if (isActive !== undefined) filter.isActive = isActive === 'true';
+    const list = await LeaveStructure.find(filter).sort({ name: 1 });
+    res.json({ success: true, count: list.length, data: list });
+});
+
+export const updateLeaveStructure = asyncHandler(async (req, res) => {
+    const s = await LeaveStructure.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!s) { res.status(404); throw new Error('Leave structure not found'); }
+    res.json({ success: true, data: s });
+});
+
+export const deleteLeaveStructure = asyncHandler(async (req, res) => {
+    const s = await LeaveStructure.findById(req.params.id);
+    if (!s) { res.status(404); throw new Error('Leave structure not found'); }
+    s.deletedAt = new Date(); s.isActive = false; await s.save();
+    res.json({ success: true });
+});
+
+export const getMyEmployeeProfile = asyncHandler(async (req, res) => {
+    const emp = await Employee.findOne({ userId: req.user._id })
+        .populate('departmentId', 'name code')
+        .populate('designationId', 'name code')
+        .populate('workShift', 'name startTime endTime')
+        .populate('salaryStructureId', 'name code components')
+        .populate('leaveStructureId', 'name code leaveBalances');
+    if (!emp) {
+        res.status(404);
+        throw new Error('Employee profile not found for this user');
+    }
+    res.json({ success: true, data: emp });
 });

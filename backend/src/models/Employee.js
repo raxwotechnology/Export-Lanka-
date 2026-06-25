@@ -97,6 +97,7 @@ const employeeSchema = new mongoose.Schema({
 
     // Compensation
     salaryStructureId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalaryStructure' },
+    leaveStructureId: { type: mongoose.Schema.Types.ObjectId, ref: 'LeaveStructure' },
     basicSalary: { type: Number, default: 0 }, // monthly basic
     currency: { type: String, default: 'LKR' },
 

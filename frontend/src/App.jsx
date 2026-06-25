@@ -90,6 +90,7 @@ import AttendancePage from './pages/AttendancePage';
 import LeaveRequestsPage from './pages/LeaveRequestsPage';
 import HolidaysPage from './pages/HolidaysPage';
 import SalaryStructuresPage from './pages/SalaryStructuresPage';
+import LeaveStructuresPage from './pages/LeaveStructuresPage';
 import PayrollsPage from './pages/PayrollsPage';
 import PayrollDetailPage from './pages/PayrollDetailPage';
 import PayslipDetailPage from './pages/PayslipDetailPage';
@@ -215,6 +216,7 @@ function App() {
         <Route path="/leaves" element={<ProtectedRoute requiredPermission="hr.leaves.view"><LeaveRequestsPage /></ProtectedRoute>} />
         <Route path="/holidays" element={<ProtectedRoute requiredPermission="hr.employees.view"><HolidaysPage /></ProtectedRoute>} />
         <Route path="/salary-structures" element={<ProtectedRoute requiredPermission="hr.salary.view"><SalaryStructuresPage /></ProtectedRoute>} />
+        <Route path="/leave-structures" element={<ProtectedRoute requiredPermission="hr.leaves.view"><LeaveStructuresPage /></ProtectedRoute>} />
         <Route path="/payroll" element={<ProtectedRoute requiredPermission="hr.payroll.view"><PayrollsPage /></ProtectedRoute>} />
         <Route path="/payroll/:id" element={<ProtectedRoute requiredPermission="hr.payroll.view"><PayrollDetailPage /></ProtectedRoute>} />
         <Route path="/payroll/:payrollId/payslip/:employeeId" element={<ProtectedRoute requiredPermission="hr.payroll.view"><PayslipDetailPage /></ProtectedRoute>} />

@@ -9,6 +9,7 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import { useCreateUser, useUpdateUser } from './useUsers';
 import { ROLES, getRoleConfig } from './roleConfig';
+import { useDesignations } from '../hr/useHr';
 
 const createSchema = z.object({
     firstName: z.string().min(1, 'First name required').max(50),
@@ -18,6 +19,7 @@ const createSchema = z.object({
     phone: z.string().optional().or(z.literal('')),
     role: z.string().min(1, 'Select a role'),
     isActive: z.boolean().optional(),
+    designationId: z.string().optional(),
 });
 
 const updateSchema = z.object({
@@ -41,6 +43,7 @@ export default function UserFormModal({ isOpen, onClose, user = null }) {
         defaultValues: {
             firstName: '', lastName: '', email: '', password: '',
             phone: '', role: 'staff', isActive: true, permissions: '',
+            designationId: '',
         },
     });
 
@@ -96,14 +99,23 @@ export default function UserFormModal({ isOpen, onClose, user = null }) {
                     password: data.password,
                     phone: data.phone || undefined,
                     role: data.role,
+                    designationId: data.designationId || undefined,
                 });
             }
             onClose();
         } catch { }
     };
 
+    const { data: designationsData } = useDesignations({ isActive: true });
     const roleConfig = getRoleConfig(selectedRole);
     const roleOptions = ROLES.map((r) => ({ value: r.value, label: r.label }));
+    const designationOptions = [
+        { value: '', label: 'None (Do not create employee profile)' },
+        ...(designationsData?.data || []).map((d) => ({
+            value: d._id,
+            label: d.departmentId ? `${d.name} (${d.departmentId.name})` : d.name
+        }))
+    ];
     const isLoading = createMutation.isPending || updateMutation.isPending;
 
     return (
@@ -140,6 +152,13 @@ export default function UserFormModal({ isOpen, onClose, user = null }) {
                     )}
 
                     <Input label="Phone" type="tel" {...register('phone')} />
+
+                    {!isEdit && (
+                        <Select label="Designation / Position"
+                            options={designationOptions}
+                            error={errors.designationId?.message}
+                            {...register('designationId')} />
+                    )}
 
                     <div>
                         <Select label="Role" required
