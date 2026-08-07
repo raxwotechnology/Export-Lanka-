@@ -98,7 +98,7 @@ export default function CustomersPage() {
                             <span title="Overdue"><AlertTriangle size={14} className="text-amber-500" /></span>
                         )}
                     </p>
-                    {r.companyName && r.companyName !== r.displayName && (
+                    {r.customerType === 'company' && r.companyName && r.companyName !== r.displayName && (
                         <p className="text-xs text-gray-500">{r.companyName}</p>
                     )}
                 </div>

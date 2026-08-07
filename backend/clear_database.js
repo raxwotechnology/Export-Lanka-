@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 
 dotenv.config();
 
+const KEEP_ADMIN_EMAIL = 'admin@admin.com';
+
 async function run() {
     try {
         await mongoose.connect(process.env.MONGO_URI);
@@ -15,14 +17,15 @@ async function run() {
         for (const col of collections) {
             const name = col.collectionName;
             if (name === 'users') {
-                console.log(`- Skipping ${name} (preserves logins)`);
-                continue;
-            }
-            try {
-                const result = await col.deleteMany({});
-                console.log(`- Cleared ${name}: deleted ${result.deletedCount} documents`);
-            } catch (err) {
-                console.log(`- Failed to clear ${name}: ${err.message}`);
+                const result = await col.deleteMany({ email: { $ne: KEEP_ADMIN_EMAIL } });
+                console.log(`- Cleared ${name}: deleted ${result.deletedCount} users (kept ${KEEP_ADMIN_EMAIL})`);
+            } else {
+                try {
+                    const result = await col.deleteMany({});
+                    console.log(`- Cleared ${name}: deleted ${result.deletedCount} documents`);
+                } catch (err) {
+                    console.log(`- Failed to clear ${name}: ${err.message}`);
+                }
             }
         }
         
@@ -33,7 +36,11 @@ async function run() {
             console.log(`- ${col.collectionName}: ${count} docs remaining`);
         }
 
-        console.log('\n🎉 DATABASE CLEARED SUCCESSFULLY (Logins preserved!)');
+        const remainingUsers = await db.collection('users').find({}).toArray();
+        console.log('\n--- Remaining Users ---');
+        remainingUsers.forEach(u => console.log(`- ID: ${u._id} | Email: ${u.email} | Role: ${u.role}`));
+
+        console.log(`\n🎉 DATABASE CLEARED SUCCESSFULLY! Only 1 Admin (${KEEP_ADMIN_EMAIL}) preserved.`);
     } catch (err) {
         console.error('❌ Cleanup failed:', err);
     } finally {
@@ -43,3 +50,4 @@ async function run() {
 }
 
 run();
+

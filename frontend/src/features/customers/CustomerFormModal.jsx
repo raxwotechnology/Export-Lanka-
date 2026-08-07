@@ -127,10 +127,10 @@ export default function CustomerFormModal({ isOpen, onClose, customer = null }) 
         const payload = {
             customerType: data.customerType,
             businessType: data.businessType,
-            companyName: data.companyName || undefined,
+            companyName: data.customerType === 'company' ? (data.companyName || null) : null,
             displayName: data.displayName,
-            firstName: data.firstName || undefined,
-            lastName: data.lastName || undefined,
+            firstName: data.customerType === 'individual' ? (data.firstName || null) : null,
+            lastName: data.customerType === 'individual' ? (data.lastName || null) : null,
             customerGroupId: data.customerGroupId || undefined,
             taxRegistrationNumber: data.taxRegistrationNumber || undefined,
             businessRegistrationNumber: data.businessRegistrationNumber || undefined,
