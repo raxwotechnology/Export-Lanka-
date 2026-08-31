@@ -79,7 +79,7 @@ export default function GrnsPage() {
         try {
             const [grnRes, supRes, farmRes, whRes, prodRes, poRes, bankRes] = await Promise.all([
                 api.get('/grns'),
-                api.get('/suppliers'),
+                api.get('/suppliers?limit=0'),
                 api.get('/farms?status=active'),
                 api.get('/warehouses'),
                 api.get('/products'),

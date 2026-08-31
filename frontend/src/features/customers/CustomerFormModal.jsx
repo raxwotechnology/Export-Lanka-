@@ -124,30 +124,34 @@ export default function CustomerFormModal({ isOpen, onClose, customer = null }) 
     }, [isOpen, customer, reset]);
 
     const onSubmit = async (data) => {
+        const computedDisplayName = data.displayName?.trim() || 
+            (data.customerType === 'company' ? data.companyName : `${data.firstName || ''} ${data.lastName || ''}`.trim()) || 
+            'Customer';
+
         const payload = {
             customerType: data.customerType,
             businessType: data.businessType,
             companyName: data.customerType === 'company' ? (data.companyName || null) : null,
-            displayName: data.displayName,
+            displayName: computedDisplayName,
             firstName: data.customerType === 'individual' ? (data.firstName || null) : null,
             lastName: data.customerType === 'individual' ? (data.lastName || null) : null,
-            customerGroupId: data.customerGroupId || undefined,
-            taxRegistrationNumber: data.taxRegistrationNumber || undefined,
-            businessRegistrationNumber: data.businessRegistrationNumber || undefined,
-            industry: data.industry || undefined,
-            primaryContact: data.primaryContact,
-            billingAddress: data.billingAddress,
-            shippingAddresses: data.shippingAddresses?.filter((a) => a.line1),
-            contacts: data.contacts?.filter((c) => c.name),
-            assignedSalesRep: data.assignedSalesRep || undefined,
+            customerGroupId: data.customerGroupId || null,
+            taxRegistrationNumber: data.taxRegistrationNumber || '',
+            businessRegistrationNumber: data.businessRegistrationNumber || '',
+            industry: data.industry || '',
+            primaryContact: data.primaryContact || {},
+            billingAddress: data.billingAddress || {},
+            shippingAddresses: data.shippingAddresses?.filter((a) => a.line1) || [],
+            contacts: data.contacts?.filter((c) => c.name) || [],
+            assignedSalesRep: data.assignedSalesRep || null,
             paymentTerms: {
-                type: data.paymentTermsType,
-                creditDays: data.creditDays || 0,
-                creditLimit: data.creditLimit || 0,
+                type: data.paymentTermsType || 'cod',
+                creditDays: Number(data.creditDays) || 0,
+                creditLimit: Number(data.creditLimit) || 0,
             },
-            defaultDiscountPercent: data.defaultDiscountPercent || 0,
+            defaultDiscountPercent: Number(data.defaultDiscountPercent) || 0,
             status: data.status,
-            notes: data.notes || undefined,
+            notes: data.notes || '',
         };
 
         try {

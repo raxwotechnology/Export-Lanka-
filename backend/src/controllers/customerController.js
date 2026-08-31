@@ -87,8 +87,8 @@ export const getCustomerById = asyncHandler(async (req, res) => {
 
 export const updateCustomer = asyncHandler(async (req, res) => {
     const payload = { ...req.body, updatedBy: req.user._id };
-    if (payload.customerGroupId === '') payload.customerGroupId = null;
-    if (payload.assignedSalesRep === '') payload.assignedSalesRep = null;
+    if (!payload.customerGroupId) payload.customerGroupId = null;
+    if (!payload.assignedSalesRep) payload.assignedSalesRep = null;
 
     const oldData = await Customer.findById(req.params.id);
     const customer = await Customer.findByIdAndUpdate(req.params.id, payload, {

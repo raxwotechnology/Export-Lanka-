@@ -40,6 +40,23 @@ export const useCreateInvoice = () => {
     });
 };
 
+export const useUpdateInvoice = () => {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }) => invoicesApi.update(id, data),
+        onSuccess: (_, { id }) => {
+            qc.invalidateQueries({ queryKey: ['invoices'] });
+            qc.invalidateQueries({ queryKey: ['invoice', id] });
+            qc.invalidateQueries({ queryKey: ['customers'] });
+            qc.invalidateQueries({ queryKey: ['stock'] });
+            qc.invalidateQueries({ queryKey: ['stockMovements'] });
+            invalidateReportsAndDashboard(qc);
+            toast.success('Invoice updated successfully');
+        },
+        onError: (err) => toast.error(err.response?.data?.message || 'Failed to update invoice'),
+    });
+};
+
 export const useGenerateFromSO = () => {
     const qc = useQueryClient();
     return useMutation({

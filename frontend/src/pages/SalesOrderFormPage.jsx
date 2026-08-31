@@ -47,14 +47,13 @@ export default function SalesOrderFormPage() {
     });
     const { data: productsData } = useQuery({
         queryKey: ['products', 'active'],
-        queryFn: () => productsApi.list({ status: 'active', limit: 500 }),
+        queryFn: () => productsApi.list({ status: 'active', limit: 0 }),
     });
     const { data: warehousesData } = useWarehouses({ isActive: true });
 
     const customers = customersData?.data || [];
-    const NON_SELLABLE_TYPES = ['raw_material', 'packaging', 'consumable', 'service'];
     const products = (productsData?.data || []).filter(
-        (p) => p.canBeSold !== false && !NON_SELLABLE_TYPES.includes(p.productType)
+        (p) => p.canBeSold !== false
     );
     const warehouses = warehousesData?.data || [];
 

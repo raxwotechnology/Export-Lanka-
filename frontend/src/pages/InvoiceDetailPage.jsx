@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Ban, Printer, Receipt } from 'lucide-react';
+import { ArrowLeft, Send, Ban, Printer, Receipt, Edit } from 'lucide-react';
 
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
@@ -96,6 +96,11 @@ export default function InvoiceDetailPage() {
                         <Button variant="outline" onClick={handlePrint}>
                             <Printer size={16} className="mr-1.5" /> Print
                         </Button>
+                        {inv.status !== 'cancelled' && (
+                            <Button variant="outline" onClick={() => navigate(`/invoices/${inv._id}/edit`)}>
+                                <Edit size={16} className="mr-1.5" /> Edit
+                            </Button>
+                        )}
                         {inv.balanceDue > 0 && inv.paymentStatus !== 'cancelled' && (
                             <Button variant="outline" onClick={() => navigate(`/payments/new?invoiceId=${inv._id}`)}>
                                 <Receipt size={16} className="mr-1.5" /> Record Payment

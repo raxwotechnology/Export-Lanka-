@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Eye, FileText, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Eye, FileText, AlertTriangle, Edit } from 'lucide-react';
 
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
@@ -85,12 +85,20 @@ export default function InvoicesPage() {
             render: (r) => <Badge variant={paymentStatusVariant[r.paymentStatus]}>{r.paymentStatus.replace('_', ' ')}</Badge>,
         },
         {
-            key: 'actions', label: '', width: '50px',
+            key: 'actions', label: '', width: '80px',
             render: (r) => (
-                <button onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${r._id}`); }}
-                    className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded">
-                    <Eye size={16} />
-                </button>
+                <div className="flex gap-1">
+                    <button onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${r._id}`); }}
+                        className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded" title="View Details">
+                        <Eye size={16} />
+                    </button>
+                    {r.status !== 'cancelled' && (
+                        <button onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${r._id}/edit`); }}
+                            className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded" title="Edit Invoice">
+                            <Edit size={16} />
+                        </button>
+                    )}
+                </div>
             ),
         },
     ];

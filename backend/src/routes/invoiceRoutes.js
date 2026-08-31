@@ -1,7 +1,7 @@
 import express from 'express';
 import {
     createInvoice, createFromSalesOrder, getInvoices, getInvoiceById,
-    getAgingSummary, changeInvoiceStatus, deleteInvoice,
+    getAgingSummary, changeInvoiceStatus, deleteInvoice, updateInvoice,
 } from '../controllers/invoiceController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
@@ -34,6 +34,7 @@ router.post(
 router
     .route('/:id')
     .get(requirePermission('invoices.view'), getInvoiceById)
+    .put(requirePermission('invoices.edit'), updateInvoice)
     .delete(requirePermission('invoices.view'), deleteInvoice); // Assuming delete requires view at least, or separate code if needed
 
 router.patch(

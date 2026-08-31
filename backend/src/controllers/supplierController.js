@@ -27,11 +27,12 @@ export const getSuppliers = asyncHandler(async (req, res) => {
     if (category) filter.category = category;
     if (status) filter.status = status;
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const limitNum = (limit === '0' || limit === 0 || limit === 'all') ? 0 : Number(limit);
+    const skip = limitNum > 0 ? (Number(page) - 1) * limitNum : 0;
     const sortObj = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
 
     const [suppliers, total] = await Promise.all([
-        Supplier.find(filter).sort(sortObj).skip(skip).limit(Number(limit)),
+        Supplier.find(filter).sort(sortObj).skip(skip).limit(limitNum),
         Supplier.countDocuments(filter),
     ]);
 
@@ -40,7 +41,7 @@ export const getSuppliers = asyncHandler(async (req, res) => {
         count: suppliers.length,
         total,
         page: Number(page),
-        totalPages: Math.ceil(total / Number(limit)),
+        totalPages: limitNum > 0 ? Math.ceil(total / limitNum) : 1,
         data: suppliers,
     });
 });

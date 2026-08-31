@@ -160,6 +160,7 @@ function App() {
         <Route path="/invoices/new" element={<ProtectedRoute requiredPermission="invoices.create"><InvoiceFormPage /></ProtectedRoute>} />
         <Route path="/invoices/from-sales-order" element={<ProtectedRoute requiredPermission="invoices.create"><InvoiceFromSalesOrderPage /></ProtectedRoute>} />
         <Route path="/invoices/:id" element={<ProtectedRoute requiredPermission="invoices.view"><InvoiceDetailPage /></ProtectedRoute>} />
+        <Route path="/invoices/:id/edit" element={<ProtectedRoute requiredPermission="invoices.edit"><InvoiceFormPage /></ProtectedRoute>} />
         <Route path="/bills" element={<ProtectedRoute requiredPermission="bills.view"><BillsPage /></ProtectedRoute>} />
         <Route path="/bills/from-grn" element={<ProtectedRoute requiredPermission="bills.manage"><BillFromGrnPage /></ProtectedRoute>} />
         <Route path="/bills/:id" element={<ProtectedRoute requiredPermission="bills.view"><BillDetailPage /></ProtectedRoute>} />

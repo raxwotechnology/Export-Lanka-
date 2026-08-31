@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Plus, Trash2, ArrowLeft, Save } from 'lucide-react';
@@ -13,11 +13,16 @@ import Textarea from '../components/ui/Textarea';
 
 import { customersApi } from '../features/customers/customersApi';
 import { productsApi } from '../features/products/productsApi';
-import { useCreateInvoice } from '../features/invoices/useInvoices';
+import { useCreateInvoice, useUpdateInvoice, useInvoice } from '../features/invoices/useInvoices';
 
 export default function InvoiceFormPage() {
+    const { id } = useParams();
+    const isEdit = !!id;
     const navigate = useNavigate();
+
     const createMutation = useCreateInvoice();
+    const updateMutation = useUpdateInvoice();
+    const { data: invoiceRes, isLoading: isInvoiceLoading } = useInvoice(id);
 
     const [customerId, setCustomerId] = useState('');
     const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
@@ -30,19 +35,43 @@ export default function InvoiceFormPage() {
 
     const { data: customersData } = useQuery({
         queryKey: ['customers', 'active'],
-        queryFn: () => customersApi.list({ status: 'active', limit: 500 }),
+        queryFn: () => customersApi.list({ status: 'active', limit: 0 }),
     });
     const { data: productsData } = useQuery({
         queryKey: ['products', 'active'],
-        queryFn: () => productsApi.list({ status: 'active', limit: 500 }),
+        queryFn: () => productsApi.list({ status: 'active', limit: 0 }),
     });
+
+    useEffect(() => {
+        if (isEdit && invoiceRes?.data) {
+            const inv = invoiceRes.data;
+            setCustomerId(inv.customerId?._id || inv.customerId || '');
+            if (inv.invoiceDate) setInvoiceDate(new Date(inv.invoiceDate).toISOString().split('T')[0]);
+            if (inv.dueDate) setDueDate(new Date(inv.dueDate).toISOString().split('T')[0]);
+            if (inv.invoiceType) setInvoiceType(inv.invoiceType);
+            setNotes(inv.notes || '');
+            setPaymentInstructions(inv.paymentInstructions || '');
+            setShippingCost(inv.shippingCost || 0);
+            if (inv.items?.length) {
+                setItems(inv.items.map(item => ({
+                    productId: item.productId?._id || item.productId || '',
+                    productCode: item.productCode || '',
+                    productName: item.productName || '',
+                    quantity: item.quantity || 1,
+                    unitOfMeasure: item.unitOfMeasure || '',
+                    unitPrice: item.unitPrice || 0,
+                    taxRate: item.taxRate || 0,
+                    taxable: item.taxable ?? true,
+                })));
+            }
+        }
+    }, [isEdit, invoiceRes]);
 
     const customerOptions = (customersData?.data || []).map((c) => ({
         value: c._id, label: `${c.displayName} (${c.customerCode})`,
     }));
-    const NON_SELLABLE_TYPES = ['raw_material', 'packaging', 'consumable', 'service'];
     const productOptions = (productsData?.data || [])
-        .filter((p) => p.canBeSold !== false && !NON_SELLABLE_TYPES.includes(p.productType))
+        .filter((p) => p.canBeSold !== false)
         .map((p) => ({
             value: p._id, label: `${p.name} — ${p.productCode}`,
         }));
@@ -81,6 +110,8 @@ export default function InvoiceFormPage() {
 
     const fmt = (n) => new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 }).format(n || 0);
 
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
     const submit = async () => {
         if (!customerId) { toast.error('Select customer'); return; }
         if (items.length === 0 || items.some((i) => !i.productName || !i.quantity)) {
@@ -88,30 +119,43 @@ export default function InvoiceFormPage() {
             return;
         }
 
+        const payload = {
+            customerId,
+            invoiceType,
+            invoiceDate,
+            dueDate: dueDate || undefined,
+            items: items.map((i) => ({
+                productId: i.productId || undefined,
+                productCode: i.productCode || undefined,
+                productName: i.productName,
+                quantity: +i.quantity,
+                unitOfMeasure: i.unitOfMeasure || undefined,
+                unitPrice: +i.unitPrice,
+                taxRate: +i.taxRate || 0,
+                taxable: i.taxable,
+            })),
+            shippingCost: +shippingCost || 0,
+            notes: notes || undefined,
+            paymentInstructions: paymentInstructions || undefined,
+        };
+
         try {
-            const result = await createMutation.mutateAsync({
-                customerId,
-                invoiceType,
-                invoiceDate,
-                dueDate: dueDate || undefined,
-                items: items.map((i) => ({
-                    productId: i.productId || undefined,
-                    productCode: i.productCode || undefined,
-                    productName: i.productName,
-                    quantity: +i.quantity,
-                    unitOfMeasure: i.unitOfMeasure || undefined,
-                    unitPrice: +i.unitPrice,
-                    taxRate: +i.taxRate || 0,
-                    taxable: i.taxable,
-                })),
-                shippingCost: +shippingCost || 0,
-                notes: notes || undefined,
-                paymentInstructions: paymentInstructions || undefined,
-                status: 'approved',
-            });
-            navigate(`/invoices/${result.data._id}`);
+            if (isEdit) {
+                const result = await updateMutation.mutateAsync({ id, data: payload });
+                navigate(`/invoices/${result.data._id || id}`);
+            } else {
+                const result = await createMutation.mutateAsync({
+                    ...payload,
+                    status: 'approved',
+                });
+                navigate(`/invoices/${result.data._id}`);
+            }
         } catch { }
     };
+
+    if (isEdit && isInvoiceLoading) {
+        return <div className="p-8 text-center text-gray-500">Loading invoice details...</div>;
+    }
 
     return (
         <div>
@@ -210,9 +254,9 @@ export default function InvoiceFormPage() {
                                 <span>Total</span><span className="text-primary-600">{fmt(totals.grand)}</span>
                             </div>
                         </div>
-                        <Button variant="primary" fullWidth className="mt-6" onClick={submit} loading={createMutation.isPending}
+                        <Button variant="primary" fullWidth className="mt-6" onClick={submit} loading={isSubmitting}
                             disabled={!customerId || items.length === 0}>
-                            <Save size={16} className="mr-1.5" /> Create Invoice
+                            <Save size={16} className="mr-1.5" /> {isEdit ? 'Update Invoice' : 'Create Invoice'}
                         </Button>
                     </Card>
                 </div>

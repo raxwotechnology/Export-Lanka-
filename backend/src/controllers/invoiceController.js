@@ -388,6 +388,60 @@ export const changeInvoiceStatus = asyncHandler(async (req, res) => {
 });
 
 /**
+ * PUT /api/invoices/:id
+ * Update an existing invoice
+ */
+export const updateInvoice = asyncHandler(async (req, res) => {
+    const { customerId, items, dueDate, invoiceDate, invoiceType, shippingCost, otherCharges, notes, paymentInstructions, status } = req.body;
+
+    const invoice = await Invoice.findById(req.params.id);
+    if (!invoice) {
+        res.status(404);
+        throw new Error('Invoice not found');
+    }
+
+    if (invoice.status === 'cancelled') {
+        res.status(400);
+        throw new Error('Cannot edit a cancelled invoice');
+    }
+
+    if (customerId && customerId !== invoice.customerId?.toString()) {
+        const customer = await Customer.findById(customerId);
+        if (!customer) { res.status(404); throw new Error('Customer not found'); }
+        invoice.customerId = customer._id;
+        invoice.customerSnapshot = {
+            name: customer.displayName,
+            code: customer.customerCode,
+            taxRegistrationNumber: customer.taxRegistrationNumber,
+            contactName: customer.primaryContact?.name,
+        };
+        invoice.billingAddress = customer.billingAddress;
+        invoice.shippingAddress = customer.shippingAddresses?.find((a) => a.isDefault) || customer.billingAddress;
+        invoice.salesRepId = customer.assignedSalesRep;
+    }
+
+    if (items) invoice.items = items;
+    if (invoiceDate) invoice.invoiceDate = invoiceDate;
+    if (dueDate) invoice.dueDate = dueDate;
+    if (invoiceType) invoice.invoiceType = invoiceType;
+    if (shippingCost !== undefined) invoice.shippingCost = Number(shippingCost) || 0;
+    if (otherCharges !== undefined) invoice.otherCharges = Number(otherCharges) || 0;
+    if (notes !== undefined) invoice.notes = notes;
+    if (paymentInstructions !== undefined) invoice.paymentInstructions = paymentInstructions;
+    if (status) invoice.status = status;
+    invoice.updatedBy = req.user._id;
+
+    await invoice.save();
+    await updateCustomerBalance(invoice.customerId);
+
+    const populated = await Invoice.findById(invoice._id)
+        .populate('customerId', 'displayName customerCode')
+        .populate('salesOrderIds', 'orderNumber');
+
+    res.json({ success: true, data: populated });
+});
+
+/**
  * DELETE /api/invoices/:id
  */
 export const deleteInvoice = asyncHandler(async (req, res) => {

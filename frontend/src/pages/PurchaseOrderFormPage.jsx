@@ -40,7 +40,7 @@ export default function PurchaseOrderFormPage() {
 
     const { data: suppliersData } = useQuery({
         queryKey: ['suppliers', 'active'],
-        queryFn: () => suppliersApi.list({ status: 'active', limit: 500 }),
+        queryFn: () => suppliersApi.list({ status: 'active', limit: 0 }),
     });
     const { data: productsData } = useQuery({
         queryKey: ['products', 'active'],
