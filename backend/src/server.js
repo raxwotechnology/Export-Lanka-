@@ -178,11 +178,20 @@ app.use('/api/production/machines', machineRoutes);
 app.use('/api/gate-passes', gatePassRoutes);
 
 
-// Health check endpoint
+// Root & Health check endpoints
+app.get('/', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Export Lanka Wholesale ERP Backend API is running',
+        status: 'online',
+        timestamp: new Date().toISOString(),
+    });
+});
+
 app.get('/api/health', (req, res) => {
     res.json({
         success: true,
-        message: 'Server is running',
+        message: 'Server is healthy and running',
         timestamp: new Date().toISOString(),
     });
 });

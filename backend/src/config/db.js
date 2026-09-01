@@ -1,8 +1,17 @@
 import mongoose from 'mongoose';
 
 const connectDB = async () => {
+    const mongoUri = process.env.MONGO_URI;
+    if (!mongoUri) {
+        console.error('❌ MongoDB Connection Error: MONGO_URI is not defined in environment variables.');
+        console.error('👉 Please configure MONGO_URI in your Render Environment Variables dashboard.');
+        return null;
+    }
+
     try {
-        const conn = await mongoose.connect(process.env.MONGO_URI);
+        const conn = await mongoose.connect(mongoUri, {
+            serverSelectionTimeoutMS: 10000,
+        });
         console.log(`✓ MongoDB Connected: ${conn.connection.host}`);
         
         try {
@@ -15,7 +24,8 @@ const connectDB = async () => {
         return conn;
     } catch (error) {
         console.error(`✗ MongoDB Connection Error: ${error.message}`);
-        process.exit(1);
+        console.error('👉 Ensure that your MongoDB Atlas cluster Network Access allows 0.0.0.0/0 (Anywhere).');
+        return null;
     }
 };
 
