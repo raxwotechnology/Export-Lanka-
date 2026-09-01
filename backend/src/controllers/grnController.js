@@ -10,6 +10,7 @@ import { increaseStock } from '../services/stockService.js';
 import { generateJulianBatchCode } from '../utils/julianDate.js';
 import { getIO } from '../services/socketService.js';
 import { sendGrnConfirmationSms, sendGrnCreationSms } from '../services/smsService.js';
+import { checkAndApplyEditLimit } from '../utils/editLimitHelper.js';
 
 /**
  * Create a GRN — saves in 'pending_approval' queue state and does NOT update active stock immediately.
@@ -464,6 +465,104 @@ export const getGrnById = asyncHandler(async (req, res) => {
         .populate('createdBy', 'firstName lastName');
     if (!grn) { res.status(404); throw new Error('GRN not found'); }
     res.json({ success: true, data: grn });
+});
+
+export const updateGrn = asyncHandler(async (req, res) => {
+    const grn = await GoodsReceiptNote.findById(req.params.id);
+    if (!grn) {
+        res.status(404);
+        throw new Error('GRN not found');
+    }
+
+    // Check & enforce 2-time edit limit for Factory Manager
+    checkAndApplyEditLimit(grn, req.user, 'Goods Receipt Note');
+
+    const {
+        warehouseId,
+        receiptDate,
+        supplierDeliveryNoteNumber,
+        supplierInvoiceNumber,
+        vehicleNumber,
+        driverName,
+        transportCompany,
+        notes,
+        items,
+        sourceType,
+        supplierId,
+        farmId
+    } = req.body;
+
+    if (warehouseId) grn.warehouseId = warehouseId;
+    if (receiptDate) grn.receiptDate = receiptDate;
+    if (supplierDeliveryNoteNumber !== undefined) grn.supplierDeliveryNoteNumber = supplierDeliveryNoteNumber;
+    if (supplierInvoiceNumber !== undefined) grn.supplierInvoiceNumber = supplierInvoiceNumber;
+    if (vehicleNumber !== undefined) grn.vehicleNumber = vehicleNumber;
+    if (driverName !== undefined) grn.driverName = driverName;
+    if (transportCompany !== undefined) grn.transportCompany = transportCompany;
+    if (notes !== undefined) grn.notes = notes;
+    if (sourceType) grn.sourceType = sourceType;
+    if (supplierId) grn.supplierId = supplierId;
+    if (farmId) grn.farmId = farmId;
+
+    if (items && Array.isArray(items)) {
+        if (grn.status === 'pending_approval' || grn.status === 'draft') {
+            const Product = mongoose.model('Product');
+            const updatedItems = [];
+            for (const item of items) {
+                let productCode = item.productCode;
+                let productName = item.productName;
+                let unitOfMeasure = item.unitOfMeasure;
+                let unitPrice = Number(item.unitPrice) || 0;
+
+                if (item.productId && (!productName || !unitOfMeasure)) {
+                    const prod = await Product.findById(item.productId);
+                    if (prod) {
+                        productCode = prod.productCode || productCode;
+                        productName = prod.name || productName;
+                        unitOfMeasure = prod.unitOfMeasure || unitOfMeasure;
+                        unitPrice = unitPrice || prod.basePrice || 0;
+                    }
+                }
+
+                updatedItems.push({
+                    poLineItemId: item.poLineItemId || null,
+                    productId: item.productId,
+                    productCode,
+                    productName,
+                    orderedQuantity: Number(item.orderedQuantity) || 0,
+                    receivedQuantity: Number(item.receivedQuantity) || 0,
+                    acceptedQuantity: Number(item.acceptedQuantity) || 0,
+                    rejectedQuantity: Number(item.rejectedQuantity) || 0,
+                    damagedQuantity: Number(item.damagedQuantity) || 0,
+                    unitOfMeasure: unitOfMeasure || 'Kg',
+                    unitPrice,
+                    batchNumber: item.batchNumber || null,
+                    manufactureDate: item.manufactureDate || null,
+                    expiryDate: item.expiryDate || null,
+                    rejectionReason: item.rejectionReason || null,
+                    notes: item.notes,
+                    qcStatus: item.qcStatus || 'pending',
+                });
+            }
+            grn.items = updatedItems;
+        }
+    }
+
+    await grn.save();
+
+    const populated = await GoodsReceiptNote.findById(grn._id)
+        .populate('purchaseOrderId', 'poNumber poDate')
+        .populate('supplierId', 'displayName supplierCode')
+        .populate('warehouseId', 'name warehouseCode')
+        .populate('items.productId', 'name productCode')
+        .populate('receivedBy', 'firstName lastName')
+        .populate('createdBy', 'firstName lastName');
+
+    res.json({
+        success: true,
+        message: 'GRN updated successfully',
+        data: populated,
+    });
 });
 
 /**

@@ -26,12 +26,13 @@ const statusVariant = {
 
 export default function ProductsPage() {
     const { user } = useAuthStore();
-    const canManage = ['admin', 'manager'].includes(user?.role);
+    const canManage = ['admin', 'manager', 'factory_manager', 'warehouse_manager'].includes(user?.role);
 
     const [filters, setFilters] = useState({
         search: '',
         categoryId: '',
         status: '',
+        excludeProductType: 'raw_material',
         page: 1,
         limit: 10,
     });

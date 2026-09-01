@@ -9,6 +9,7 @@ import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
+import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
 
 import { useWarehouses } from '../features/warehouses/useWarehouses';
 import { useAdjustStock } from '../features/stock/useStock';
@@ -150,11 +151,15 @@ export default function StockAdjustmentPage() {
                                                 <span className="text-xs text-gray-500 mt-2 w-6">{idx + 1}</span>
                                                 <div className="flex-1 grid grid-cols-6 gap-2">
                                                     <div className="col-span-3">
-                                                        <Select
-                                                            placeholder="Select product..."
-                                                            options={productOptions}
+                                                        <ProductAutocompleteSelect
+                                                            placeholder="Type product name or code..."
+                                                            products={productOptions.map(p => ({
+                                                                _id: p.value,
+                                                                name: `${p.productName} (On hand: ${p.onHand.toFixed(2)})`,
+                                                                productCode: p.productCode,
+                                                            }))}
                                                             value={line.productId}
-                                                            onChange={(e) => updateLine(idx, 'productId', e.target.value)}
+                                                            onChange={(val) => updateLine(idx, 'productId', val)}
                                                         />
                                                     </div>
                                                     <div>

@@ -73,6 +73,16 @@ const grnSchema = new mongoose.Schema({
 
     notes: String,
 
+    editCount: { type: Number, default: 0 },
+    editHistory: [
+        {
+            editedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            editedAt: { type: Date, default: Date.now },
+            editNumber: Number,
+            role: String,
+        },
+    ],
+
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     deletedAt: { type: Date, default: null },
 }, { timestamps: true });

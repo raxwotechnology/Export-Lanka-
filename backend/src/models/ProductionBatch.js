@@ -114,6 +114,15 @@ const productionBatchSchema = new mongoose.Schema({
   deletedAt: { type: Date, default: null },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  editCount: { type: Number, default: 0 },
+  editHistory: [
+    {
+      editedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      editedAt: { type: Date, default: Date.now },
+      editNumber: Number,
+      role: String,
+    },
+  ],
 
 }, { timestamps: true });
 

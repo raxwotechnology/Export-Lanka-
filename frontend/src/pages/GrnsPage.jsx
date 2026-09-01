@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { Plus, Check, Clock, Search, RefreshCw, FileText, Eye, CheckCircle2, AlertTriangle, Building, Home, Trash2 } from 'lucide-react';
+import { Plus, Check, Clock, Search, RefreshCw, FileText, Eye, Edit, CheckCircle2, AlertTriangle, Building, Home, Trash2 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -17,7 +17,7 @@ import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelec
 
 export default function GrnsPage() {
     const { user } = useAuthStore();
-    const canManage = ['admin', 'manager', 'procurement_staff', 'production_staff'].includes(user?.role);
+    const canManage = ['admin', 'manager', 'factory_manager', 'procurement_staff', 'production_staff'].includes(user?.role);
 
     const [grns, setGrns] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
@@ -28,6 +28,7 @@ export default function GrnsPage() {
     const [loading, setLoading] = useState(true);
 
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [editingGrn, setEditingGrn] = useState(null);
     const [isViewOpen, setIsViewOpen] = useState(false);
     const [isQcOpen, setIsQcOpen] = useState(false);
     const [selectedGrn, setSelectedGrn] = useState(null);
@@ -82,7 +83,7 @@ export default function GrnsPage() {
                 api.get('/suppliers?limit=0'),
                 api.get('/farms?status=active'),
                 api.get('/warehouses'),
-                api.get('/products'),
+                api.get('/products?limit=0'),
                 api.get('/purchase-orders?status=approved,sent,partially_received'),
                 api.get('/finance/bank-accounts')
             ]);
@@ -105,6 +106,7 @@ export default function GrnsPage() {
     }, [fetchAllData]);
 
     const openForm = () => {
+        setEditingGrn(null);
         setFormData({
             purchaseOrderId: '',
             warehouseId: warehouses[0]?._id || '',
@@ -119,6 +121,41 @@ export default function GrnsPage() {
             transportCompany: '',
             notes: '',
             items: []
+        });
+        setNewItem({ productId: '', receivedQuantity: '', unitPrice: '' });
+        setIsFormOpen(true);
+    };
+
+    const openEditForm = (grn) => {
+        if (user?.role === 'factory_manager' && (grn.editCount || 0) >= 2) {
+            toast.error('Edit permission limit reached: Factory Manager is permitted to edit a GRN only up to 2 times.');
+            return;
+        }
+
+        setEditingGrn(grn);
+        setFormData({
+            purchaseOrderId: grn.purchaseOrderId?._id || grn.purchaseOrderId || '',
+            warehouseId: grn.warehouseId?._id || grn.warehouseId || (warehouses[0]?._id || ''),
+            sourceType: grn.sourceType || 'supplier',
+            supplierId: grn.supplierId?._id || grn.supplierId || '',
+            farmId: grn.farmId?._id || grn.farmId || '',
+            receiptDate: grn.receiptDate ? new Date(grn.receiptDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            supplierDeliveryNoteNumber: grn.supplierDeliveryNoteNumber || '',
+            supplierInvoiceNumber: grn.supplierInvoiceNumber || '',
+            vehicleNumber: grn.vehicleNumber || '',
+            driverName: grn.driverName || '',
+            transportCompany: grn.transportCompany || '',
+            notes: grn.notes || '',
+            items: (grn.items || []).map(item => ({
+                poLineItemId: item.poLineItemId || null,
+                productId: item.productId?._id || item.productId,
+                productName: item.productName || item.productId?.name,
+                productCode: item.productCode || item.productId?.productCode,
+                orderedQuantity: item.orderedQuantity || item.receivedQuantity,
+                receivedQuantity: item.receivedQuantity,
+                unitOfMeasure: item.unitOfMeasure || 'Kg',
+                unitPrice: item.unitPrice || 0
+            }))
         });
         setNewItem({ productId: '', receivedQuantity: '', unitPrice: '' });
         setIsFormOpen(true);
@@ -215,12 +252,18 @@ export default function GrnsPage() {
         }
 
         try {
-            await api.post('/grns', payload);
-            toast.success('Goods Receipt Note recorded in pending QA approval queue');
+            if (editingGrn) {
+                await api.put(`/grns/${editingGrn._id}`, payload);
+                toast.success('Goods Receipt Note updated successfully');
+            } else {
+                await api.post('/grns', payload);
+                toast.success('Goods Receipt Note recorded in pending QA approval queue');
+            }
             setIsFormOpen(false);
+            setEditingGrn(null);
             fetchAllData();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to record material receipt');
+            toast.error(err.response?.data?.message || (editingGrn ? 'Failed to update GRN' : 'Failed to record material receipt'));
         }
     };
 
@@ -320,18 +363,44 @@ export default function GrnsPage() {
         {
             key: 'actions',
             label: 'Actions',
-            render: (r) => (
-                <div className="flex gap-2">
-                    <button onClick={() => viewGrn(r)} className="p-1 text-gray-500 hover:text-primary-600 hover:bg-gray-50 rounded border border-gray-100 flex items-center gap-1 text-xs px-2 py-1">
-                        <Eye size={14} /> View
-                    </button>
-                    {r.status === 'pending_approval' && canManage && (
-                        <button onClick={() => openQcModal(r)} className="p-1 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded border border-amber-100 flex items-center gap-1 text-xs px-2 py-1">
-                            <CheckCircle2 size={14} /> QA Check
+            render: (r) => {
+                const isFactoryManager = user?.role === 'factory_manager';
+                const editCount = r.editCount || 0;
+                const isLimitReached = isFactoryManager && editCount >= 2;
+
+                return (
+                    <div className="flex gap-2 items-center">
+                        <button onClick={() => viewGrn(r)} className="p-1 text-gray-500 hover:text-primary-600 hover:bg-gray-50 rounded border border-gray-100 flex items-center gap-1 text-xs px-2 py-1">
+                            <Eye size={14} /> View
                         </button>
-                    )}
-                </div>
-            )
+                        {canManage && (
+                            <button
+                                onClick={() => openEditForm(r)}
+                                disabled={isLimitReached}
+                                title={isLimitReached ? 'Edit limit reached (2/2 edits used)' : isFactoryManager ? `Edit (${editCount}/2 edits used)` : 'Edit GRN'}
+                                className={`p-1 rounded border flex items-center gap-1 text-xs px-2 py-1 transition ${
+                                    isLimitReached
+                                        ? 'text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed'
+                                        : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-100'
+                                }`}
+                            >
+                                <Edit size={14} />
+                                <span>Edit</span>
+                                {isFactoryManager && (
+                                    <span className={`text-[10px] px-1 py-0.2 rounded font-mono ${editCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
+                                        {editCount}/2
+                                    </span>
+                                )}
+                            </button>
+                        )}
+                        {r.status === 'pending_approval' && canManage && (
+                            <button onClick={() => openQcModal(r)} className="p-1 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded border border-amber-100 flex items-center gap-1 text-xs px-2 py-1">
+                                <CheckCircle2 size={14} /> QA Check
+                            </button>
+                        )}
+                    </div>
+                );
+            }
         }
     ];
 
@@ -678,14 +747,30 @@ export default function GrnsPage() {
                 </form>
             </Modal>
 
-            {/* Create GRN Modal */}
+            {/* Create / Edit GRN Modal */}
             <Modal
                 isOpen={isFormOpen}
-                onClose={() => setIsFormOpen(false)}
-                title="Create Goods Receipt Note (GRN)"
+                onClose={() => {
+                    setIsFormOpen(false);
+                    setEditingGrn(null);
+                }}
+                title={editingGrn ? `Edit Goods Receipt Note: ${editingGrn.grnNumber}` : "Create Goods Receipt Note (GRN)"}
                 size="lg"
             >
                 <form onSubmit={handleFormSubmit} className="space-y-4">
+                    {editingGrn && user?.role === 'factory_manager' && (
+                        <div className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
+                            (editingGrn.editCount || 0) >= 2
+                                ? 'bg-red-50 border border-red-200 text-red-700'
+                                : 'bg-amber-50 border border-amber-200 text-amber-800'
+                        }`}>
+                            <AlertTriangle size={15} className="flex-shrink-0" />
+                            <span>
+                                <strong>Factory Manager Notice:</strong> You have used <strong>{editingGrn.editCount || 0} of 2</strong> permitted edits for this GRN.
+                                {(editingGrn.editCount || 0) >= 2 && ' Further edits are blocked.'}
+                            </span>
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs font-bold text-gray-600 block mb-1">Receipt Type</label>
@@ -836,8 +921,14 @@ export default function GrnsPage() {
                                                     if (prev.some(p => p._id === newProd._id)) return prev;
                                                     return [...prev, newProd];
                                                 });
+                                                setNewItem(p => ({
+                                                    ...p,
+                                                    productId: val,
+                                                    unitPrice: newProd.basePrice || newProd.costs?.lastPurchaseCost || newProd.costs?.averageCost || p.unitPrice || '',
+                                                }));
+                                            } else {
+                                                setNewItem(p => ({ ...p, productId: val }));
                                             }
-                                            setNewItem(p => ({ ...p, productId: val }));
                                         }}
                                     />
                                 </div>
@@ -939,8 +1030,14 @@ export default function GrnsPage() {
                     />
 
                     <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
-                        <Button type="button" variant="default" onClick={() => setIsFormOpen(false)}>Cancel</Button>
-                        <Button type="submit" variant="primary">Record Receipt</Button>
+                        <Button type="button" variant="default" onClick={() => { setIsFormOpen(false); setEditingGrn(null); }}>Cancel</Button>
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            disabled={user?.role === 'factory_manager' && editingGrn && (editingGrn.editCount || 0) >= 2}
+                        >
+                            {editingGrn ? 'Save GRN Changes' : 'Record Receipt'}
+                        </Button>
                     </div>
                 </form>
             </Modal>

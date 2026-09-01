@@ -1,6 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import BillOfMaterials from '../models/BillOfMaterials.js';
 import Product from '../models/Product.js';
+import { checkAndApplyEditLimit } from '../utils/editLimitHelper.js';
 
 export const createBom = asyncHandler(async (req, res) => {
     const { finishedProductId, components, ...rest } = req.body;
@@ -112,6 +113,9 @@ export const getBomById = asyncHandler(async (req, res) => {
 export const updateBom = asyncHandler(async (req, res) => {
     const bom = await BillOfMaterials.findById(req.params.id);
     if (!bom) { res.status(404); throw new Error('BOM not found'); }
+
+    // Enforce 2-time edit limit for Factory Manager
+    checkAndApplyEditLimit(bom, req.user, 'BOM');
 
     if (req.body.components) {
         const productIds = req.body.components.map((c) => c.productId);

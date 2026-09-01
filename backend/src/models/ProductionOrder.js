@@ -147,6 +147,15 @@ const productionOrderSchema = new mongoose.Schema({
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    editCount: { type: Number, default: 0 },
+    editHistory: [
+        {
+            editedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            editedAt: { type: Date, default: Date.now },
+            editNumber: Number,
+            role: String,
+        },
+    ],
     deletedAt: { type: Date, default: null },
 }, { timestamps: true });
 

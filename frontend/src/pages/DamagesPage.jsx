@@ -16,6 +16,7 @@ import toast from 'react-hot-toast';
 import { useDamages, useCreateDamage, useDamageSummary } from '../features/returns/useReturns';
 import { productsApi } from '../features/products/productsApi';
 import { useWarehouses } from '../features/warehouses/useWarehouses';
+import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
 
 export default function DamagesPage() {
     const [filters, setFilters] = useState({ source: '', page: 1, limit: 15 });
@@ -108,9 +109,19 @@ export default function DamagesPage() {
 
             <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} title="Record Damage" size="md">
                 <div className="p-6 space-y-4">
-                    <Select label="Product" required placeholder="Select product..."
-                        options={(productsData?.data || []).map((p) => ({ value: p._id, label: `${p.name} (${p.productCode})` }))}
-                        value={productId} onChange={(e) => setProductId(e.target.value)} />
+                    <ProductAutocompleteSelect
+                        label="Product *"
+                        placeholder="Search or type product..."
+                        products={productsData?.data || []}
+                        value={productId}
+                        onChange={(val, selectedProd) => {
+                            setProductId(val);
+                            if (selectedProd) {
+                                const cost = selectedProd.costs?.averageCost || selectedProd.costs?.lastPurchaseCost || selectedProd.basePrice || 0;
+                                if (cost) setCostPerUnit(cost);
+                            }
+                        }}
+                    />
                     <div className="grid grid-cols-2 gap-4">
                         <Input label="Quantity" required type="number" step="0.01" min="0.01"
                             value={quantity} onChange={(e) => setQuantity(e.target.value)} />

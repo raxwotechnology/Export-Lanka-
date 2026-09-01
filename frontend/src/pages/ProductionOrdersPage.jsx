@@ -27,7 +27,7 @@ const priorityVariant = {
 export default function ProductionOrdersPage() {
     const navigate = useNavigate();
     const { user } = useAuthStore();
-    const canCreate = ['admin', 'manager', 'production_staff'].includes(user?.role);
+    const canCreate = ['admin', 'manager', 'factory_manager', 'production_staff'].includes(user?.role);
 
     const [filters, setFilters] = useState({
         search: '', status: '', priority: '',

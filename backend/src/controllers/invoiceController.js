@@ -5,6 +5,7 @@ import Customer from '../models/Customer.js';
 import SalesOrder from '../models/SalesOrder.js';
 import Warehouse from '../models/Warehouse.js';
 import { decreaseStock } from '../services/stockService.js';
+import { checkAndApplyEditLimit } from '../utils/editLimitHelper.js';
 
 const deductStockForInvoice = async (invoice, userId) => {
     if (invoice.invoiceType === 'proforma') return; // Proforma NEVER impacts stock
@@ -399,6 +400,9 @@ export const updateInvoice = asyncHandler(async (req, res) => {
         res.status(404);
         throw new Error('Invoice not found');
     }
+
+    // Enforce 2-time edit limit for Factory Manager
+    checkAndApplyEditLimit(invoice, req.user, 'Invoice');
 
     if (invoice.status === 'cancelled') {
         res.status(400);

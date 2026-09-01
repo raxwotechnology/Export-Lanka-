@@ -5,6 +5,7 @@ import PartCounter from '../models/PartCounter.js';
 import ProductionBatch from '../models/ProductionBatch.js';
 import backupEmitter, { BACKUP_EVENTS } from '../utils/backupEventEmitter.js';
 import { createAuditLog } from '../utils/auditLogger.js';
+import { checkAndApplyEditLimit } from '../utils/editLimitHelper.js';
 
 export const createProduct = asyncHandler(async (req, res) => {
     const product = await Product.create({
@@ -38,6 +39,7 @@ export const getProducts = asyncHandler(async (req, res) => {
         status,
         type,
         productType,
+        excludeProductType,
         canBeSold,
         canBePurchased,
         canBeManufactured,
@@ -70,6 +72,7 @@ export const getProducts = asyncHandler(async (req, res) => {
     }
     if (type) filter.type = type;
     if (productType) filter.productType = productType;
+    if (excludeProductType) filter.productType = { $ne: excludeProductType };
     if (canBeSold !== undefined) filter.canBeSold = canBeSold === 'true' || canBeSold === true;
     if (canBePurchased !== undefined) filter.canBePurchased = canBePurchased === 'true' || canBePurchased === true;
     if (canBeManufactured !== undefined) filter.canBeManufactured = canBeManufactured === 'true' || canBeManufactured === true;
@@ -80,16 +83,22 @@ export const getProducts = asyncHandler(async (req, res) => {
         if (maxPrice) filter.basePrice.$lte = Number(maxPrice);
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const isAll = Number(limit) === 0 || limit === '0' || limit === 'all';
+    const limitNum = isAll ? 0 : Number(limit);
+    const skip = isAll ? 0 : (Number(page) - 1) * limitNum;
     const sortObj = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
 
+    let query = Product.find(filter)
+        .populate('categoryId', 'name code')
+        .populate('brandId', 'name')
+        .sort(sortObj);
+
+    if (!isAll) {
+        query = query.skip(skip).limit(limitNum);
+    }
+
     const [products, total] = await Promise.all([
-        Product.find(filter)
-            .populate('categoryId', 'name code')
-            .populate('brandId', 'name')
-            .sort(sortObj)
-            .skip(skip)
-            .limit(Number(limit)),
+        query,
         Product.countDocuments(filter),
     ]);
 
@@ -98,7 +107,7 @@ export const getProducts = asyncHandler(async (req, res) => {
         count: products.length,
         total,
         page: Number(page),
-        totalPages: Math.ceil(total / Number(limit)),
+        totalPages: isAll ? 1 : Math.ceil(total / Number(limit)),
         data: products,
     });
 });
@@ -118,20 +127,24 @@ export const getProductById = asyncHandler(async (req, res) => {
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
-    const oldData = await Product.findById(req.params.id);
-    const product = await Product.findByIdAndUpdate(
-        req.params.id,
-        { ...req.body, updatedBy: req.user._id },
-        { new: true, runValidators: true }
-    )
-        .populate('categoryId', 'name code')
-        .populate('brandId', 'name');
-
+    const product = await Product.findById(req.params.id);
     if (!product) {
         res.status(404);
         throw new Error('Product not found');
     }
-    res.json({ success: true, data: product });
+
+    // Check 2-time edit limit for Factory Manager
+    checkAndApplyEditLimit(product, req.user, 'Product');
+
+    const oldData = product.toObject();
+    Object.assign(product, req.body, { updatedBy: req.user._id });
+    await product.save();
+
+    const populated = await Product.findById(product._id)
+        .populate('categoryId', 'name code')
+        .populate('brandId', 'name');
+
+    res.json({ success: true, data: populated });
 
     createAuditLog({
         action: 'update',

@@ -80,9 +80,10 @@ export default function QuickCreateProductModal({
 
                 <div className="grid grid-cols-2 gap-3">
                     <Select label="Type"
-                        options={[
-                            { value: 'finished_good', label: 'Finished Good (sellable)' },
+                        options={defaultProductType === 'raw_material' ? [
                             { value: 'raw_material', label: 'Raw Material' },
+                        ] : [
+                            { value: 'finished_good', label: 'Finished Good (sellable)' },
                             { value: 'packaging', label: 'Packaging' },
                             { value: 'consumable', label: 'Consumable' },
                             { value: 'service', label: 'Service' },

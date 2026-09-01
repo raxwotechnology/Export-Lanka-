@@ -10,6 +10,7 @@ import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
+import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
 
 import { productsApi } from '../features/products/productsApi';
 import { useWarehouses } from '../features/warehouses/useWarehouses';
@@ -44,16 +45,16 @@ export default function OpeningStockPage() {
     const addLine = () => setLines([...lines, { productId: '', quantity: '', costPerUnit: '' }]);
     const removeLine = (idx) => setLines(lines.filter((_, i) => i !== idx));
 
-    const updateLine = (idx, field, value) => {
+    const updateLine = (idx, field, value, selectedProd) => {
         const newLines = [...lines];
         newLines[idx] = { ...newLines[idx], [field]: value };
 
         // When product is selected, always auto-fill cost from product's known cost data
         if (field === 'productId' && value) {
-            const product = productOptions.find((p) => p.value === value);
+            const product = selectedProd || productOptions.find((p) => p.value === value || p._id === value);
             if (product) {
                 // Priority: lastPurchaseCost → averageCost → basePrice → 0
-                const autoCost = product.lastPurchaseCost || product.averageCost || product.basePrice || '';
+                const autoCost = product.lastPurchaseCost || product.costs?.lastPurchaseCost || product.averageCost || product.costs?.averageCost || product.basePrice || '';
                 newLines[idx].costPerUnit = autoCost;
             }
         }
@@ -160,11 +161,11 @@ export default function OpeningStockPage() {
                                             <div className="flex-1 grid grid-cols-12 gap-2 items-center">
                                                 {/* Product */}
                                                 <div className="col-span-5">
-                                                    <Select
-                                                        placeholder="Select product..."
-                                                        options={productOptions}
+                                                    <ProductAutocompleteSelect
+                                                        placeholder="Type product name or code..."
+                                                        products={productsData?.data || []}
                                                         value={line.productId}
-                                                        onChange={(e) => updateLine(idx, 'productId', e.target.value)}
+                                                        onChange={(val, selectedProd) => updateLine(idx, 'productId', val, selectedProd)}
                                                     />
                                                 </div>
 

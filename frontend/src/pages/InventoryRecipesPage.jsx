@@ -25,7 +25,7 @@ export default function InventoryRecipesPage() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { user } = useAuthStore();
-    const canManage = ['admin', 'manager', 'production_staff'].includes(user?.role);
+    const canManage = ['admin', 'manager', 'factory_manager', 'production_staff'].includes(user?.role);
 
     const [filters, setFilters] = useState({ search: '', status: '', page: 1, limit: 15 });
     const [deleting, setDeleting] = useState(null);

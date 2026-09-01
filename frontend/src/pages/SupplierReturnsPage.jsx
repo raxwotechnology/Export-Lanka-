@@ -19,6 +19,7 @@ import { useSupplierReturns, useCreateSupplierReturn } from '../features/returns
 import { suppliersApi } from '../features/suppliers/suppliersApi';
 import { productsApi } from '../features/products/productsApi';
 import { useWarehouses } from '../features/warehouses/useWarehouses';
+import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
 
 export default function SupplierReturnsPage() {
     const navigate = useNavigate();
@@ -126,9 +127,18 @@ export default function SupplierReturnsPage() {
                             {items.map((item, idx) => (
                                 <div key={idx} className="grid grid-cols-5 gap-2 border rounded p-2">
                                     <div className="col-span-2">
-                                        <Select placeholder="Product..."
-                                            options={(productsData?.data || []).map((p) => ({ value: p._id, label: `${p.name}` }))}
-                                            value={item.productId} onChange={(e) => updateLine(idx, 'productId', e.target.value)} />
+                                        <ProductAutocompleteSelect
+                                            placeholder="Type product..."
+                                            products={productsData?.data || []}
+                                            value={item.productId}
+                                            onChange={(val, selectedProd) => {
+                                                updateLine(idx, 'productId', val);
+                                                if (selectedProd) {
+                                                    const price = selectedProd.costs?.lastPurchaseCost || selectedProd.costs?.averageCost || selectedProd.basePrice || 0;
+                                                    if (price) updateLine(idx, 'unitPrice', price);
+                                                }
+                                            }}
+                                        />
                                     </div>
                                     <Input type="number" step="0.01" min="0.01" placeholder="Qty" value={item.quantity}
                                         onChange={(e) => updateLine(idx, 'quantity', e.target.value)} />

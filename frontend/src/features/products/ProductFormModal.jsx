@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { AlertTriangle, ShieldCheck } from 'lucide-react';
 
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
@@ -10,6 +11,7 @@ import Textarea from '../../components/ui/Textarea';
 import { productFormSchema } from './productSchemas';
 import { useCategories, useBrands, useUoms, useCreateProduct, useUpdateProduct } from './useProducts';
 import { productsApi } from './productsApi';
+import { useAuthStore } from '../../store/authStore';
 
 const tabs = [
     { id: 'basic', label: 'Basic Info' },
@@ -19,8 +21,12 @@ const tabs = [
 ];
 
 export default function ProductFormModal({ isOpen, onClose, product = null, forceProductType = null }) {
+    const { user } = useAuthStore();
     const [activeTab, setActiveTab] = useState('basic');
     const isEdit = !!product;
+    const isFactoryManager = user?.role === 'factory_manager';
+    const editCount = Number(product?.editCount) || 0;
+    const isEditBlocked = isEdit && isFactoryManager && editCount >= 2;
 
     const { data: categoriesData } = useCategories();
     const { data: brandsData } = useBrands();
@@ -202,6 +208,16 @@ export default function ProductFormModal({ isOpen, onClose, product = null, forc
         }
     };
 
+    const productTypeOptions = forceProductType === 'raw_material'
+        ? [{ value: 'raw_material', label: 'Raw Material (for production)' }]
+        : [
+            { value: 'finished_good', label: 'Finished Good (sellable)' },
+            { value: 'semi_finished', label: 'Semi-Finished (intermediate)' },
+            { value: 'packaging', label: 'Packaging Material' },
+            { value: 'consumable', label: 'Consumable' },
+            { value: 'service', label: 'Service' },
+        ];
+
     const categoryOptions = (categoriesData?.data || []).map((c) => ({
         value: c._id,
         label: `${c.name} (${c.code})`,
@@ -221,10 +237,31 @@ export default function ProductFormModal({ isOpen, onClose, product = null, forc
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={isEdit ? `Edit Product — ${product?.productCode}` : 'Create New Product'}
+            title={isEdit ? `Edit Product — ${product?.productCode}` : (forceProductType === 'raw_material' ? 'Create Raw Material' : 'Create New Product')}
             size="xl"
         >
             <form onSubmit={handleSubmit(onSubmit, onInvalid)}>
+                {/* Factory Manager Edit Restriction Banner */}
+                {isEdit && isFactoryManager && (
+                    <div className={`mx-6 mt-4 p-3 rounded-xl border flex items-center gap-3 ${
+                        isEditBlocked 
+                            ? 'bg-rose-50 border-rose-200 text-rose-800' 
+                            : 'bg-amber-50 border-amber-200 text-amber-800'
+                    }`}>
+                        {isEditBlocked ? <AlertTriangle size={18} className="text-rose-600 flex-shrink-0" /> : <ShieldCheck size={18} className="text-amber-600 flex-shrink-0" />}
+                        <div className="text-xs">
+                            <span className="font-bold block">
+                                {isEditBlocked ? 'Edit Limit Reached (2/2 edits used)' : `Factory Manager Edit Limit (${editCount}/2 edits used)`}
+                            </span>
+                            <span>
+                                {isEditBlocked 
+                                    ? 'You have reached the maximum allowed 2 edits for this record. Further updates are locked.'
+                                    : `You can edit this product ${2 - editCount} more time${2 - editCount === 1 ? '' : 's'}.`}
+                            </span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Tabs */}
                 <div className="border-b border-gray-200">
                     <div className="flex gap-1 px-6">
@@ -302,14 +339,7 @@ export default function ProductFormModal({ isOpen, onClose, product = null, forc
                                 <Select
                                     label="Product Type" required
                                     disabled={forceProductType === 'raw_material'}
-                                    options={[
-                                        { value: 'finished_good', label: 'Finished Good (sellable)' },
-                                        { value: 'raw_material', label: 'Raw Material (for production)' },
-                                        { value: 'semi_finished', label: 'Semi-Finished (intermediate)' },
-                                        { value: 'packaging', label: 'Packaging Material' },
-                                        { value: 'consumable', label: 'Consumable' },
-                                        { value: 'service', label: 'Service' },
-                                    ]}
+                                    options={productTypeOptions}
                                     error={errors.productType?.message}
                                     {...register('productType')}
                                 />
@@ -456,8 +486,8 @@ export default function ProductFormModal({ isOpen, onClose, product = null, forc
                     <Button variant="outline" onClick={onClose} type="button" disabled={isLoading}>
                         Cancel
                     </Button>
-                    <Button type="submit" variant="primary" loading={isLoading}>
-                        {isEdit ? 'Update Product' : 'Create Product'}
+                    <Button type="submit" variant="primary" loading={isLoading} disabled={isLoading || isEditBlocked}>
+                        {isEdit ? 'Update Product' : (forceProductType === 'raw_material' ? 'Create Raw Material' : 'Create Product')}
                     </Button>
                 </div>
             </form>

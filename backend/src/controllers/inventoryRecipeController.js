@@ -1,5 +1,6 @@
 import asyncHandler from 'express-async-handler';
 import InventoryRecipe from '../models/InventoryRecipe.js';
+import { checkAndApplyEditLimit } from '../utils/editLimitHelper.js';
 
 export const createRecipe = asyncHandler(async (req, res) => {
     const recipe = await InventoryRecipe.create({
@@ -44,25 +45,23 @@ export const getRecipeById = asyncHandler(async (req, res) => {
 });
 
 export const updateRecipe = asyncHandler(async (req, res) => {
-    const recipe = await InventoryRecipe.findByIdAndUpdate(
-        req.params.id,
-        {
-            ...req.body,
-            updatedBy: req.user._id,
-        },
-        {
-            new: true,
-            runValidators: true,
-        }
-    )
-    .populate('sourceProductId', 'name productCode unitOfMeasure basePrice costs')
-    .populate('destinationProductId', 'name productCode unitOfMeasure basePrice costs');
-
+    const recipe = await InventoryRecipe.findById(req.params.id);
     if (!recipe) {
         res.status(404);
         throw new Error('Inventory Recipe not found');
     }
-    res.json({ success: true, data: recipe });
+
+    // Enforce 2-time edit limit for Factory Manager
+    checkAndApplyEditLimit(recipe, req.user, 'Inventory Recipe');
+
+    Object.assign(recipe, req.body, { updatedBy: req.user._id });
+    await recipe.save();
+
+    const populated = await InventoryRecipe.findById(recipe._id)
+        .populate('sourceProductId', 'name productCode unitOfMeasure basePrice costs')
+        .populate('destinationProductId', 'name productCode unitOfMeasure basePrice costs');
+
+    res.json({ success: true, data: populated });
 });
 
 export const deleteRecipe = asyncHandler(async (req, res) => {

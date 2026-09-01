@@ -106,6 +106,21 @@ export const ROLE_PERMISSIONS = {
     super_admin: ['*'], // wildcard = all permissions
     admin: ['*'],
 
+    factory_manager: [
+        'dashboard.view',
+        'products.view', 'products.create', 'products.edit',
+        'categories.manage', 'brands.manage', 'uom.manage',
+        'inventory.view', 'inventory.adjust', 'inventory.transfer', 'inventory.opening',
+        'warehouses.manage',
+        'purchasing.view', 'purchasing.create', 'purchasing.edit', 'grn.manage',
+        'suppliers.view',
+        'bom.view', 'bom.manage',
+        'production.view', 'production.manage',
+        'damages.view', 'damages.manage',
+        'repairs.view', 'repairs.manage',
+        'reports.inventory', 'reports.production',
+    ],
+
     warehouse_manager: [
         'dashboard.view',
         'products.view', 'products.create', 'products.edit',
