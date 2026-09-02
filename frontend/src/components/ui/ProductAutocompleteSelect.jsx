@@ -11,9 +11,11 @@ export default function ProductAutocompleteSelect({
     onChange,
     productType = 'raw_material', // 'raw_material' or 'finished_good'
     required = false,
-    disabled = false
+    disabled = false,
+    initialDisplayValue = '',
+    allowCustomText = false
 }) {
-    const [inputValue, setInputValue] = useState('');
+    const [inputValue, setInputValue] = useState(initialDisplayValue || '');
     const [isOpen, setIsOpen] = useState(false);
     const [categories, setCategories] = useState([]);
     const [searchedProducts, setSearchedProducts] = useState([]);
@@ -21,6 +23,7 @@ export default function ProductAutocompleteSelect({
     const [highlightIndex, setHighlightIndex] = useState(-1);
     const wrapperRef = useRef(null);
     const inputRef = useRef(null);
+    const prevValueRef = useRef(value);
 
     // Fetch categories on mount to determine RAW category for auto-saving raw materials
     useEffect(() => {
@@ -37,18 +40,31 @@ export default function ProductAutocompleteSelect({
         fetchCategories();
     }, []);
 
-    // Sync input value when external value changes
+    // Sync input value when external value changes or initial products arrive
     useEffect(() => {
-        if (!value) {
-            setInputValue('');
-            return;
+        if (prevValueRef.current !== value) {
+            prevValueRef.current = value;
+            if (!value) {
+                setInputValue(initialDisplayValue || '');
+                return;
+            }
+            const allProds = [...products, ...searchedProducts];
+            const found = allProds.find(p => p._id === value);
+            if (found) {
+                setInputValue(found.name);
+            } else if (initialDisplayValue) {
+                setInputValue(initialDisplayValue);
+            }
+        } else if (value && !inputValue) {
+            const allProds = [...products, ...searchedProducts];
+            const found = allProds.find(p => p._id === value);
+            if (found) {
+                setInputValue(found.name);
+            } else if (initialDisplayValue) {
+                setInputValue(initialDisplayValue);
+            }
         }
-        const allProds = [...products, ...searchedProducts];
-        const found = allProds.find(p => p._id === value);
-        if (found) {
-            setInputValue(found.name);
-        }
-    }, [value, products, searchedProducts]);
+    }, [value, products, initialDisplayValue]);
 
     // Handle clicks outside
     useEffect(() => {
@@ -111,6 +127,7 @@ export default function ProductAutocompleteSelect({
 
     const handleSelectOption = (product) => {
         setInputValue(product.name);
+        prevValueRef.current = product._id;
         onChange(product._id, product);
         setIsOpen(false);
         setHighlightIndex(-1);
@@ -119,6 +136,7 @@ export default function ProductAutocompleteSelect({
     const handleClear = (e) => {
         e.stopPropagation();
         setInputValue('');
+        prevValueRef.current = '';
         onChange('', null);
         setIsOpen(true);
         inputRef.current?.focus();
@@ -210,7 +228,7 @@ export default function ProductAutocompleteSelect({
     );
 
     return (
-        <div ref={wrapperRef} className="relative w-full">
+        <div ref={wrapperRef} className={`relative w-full ${isOpen ? 'z-50' : ''}`}>
             {label && (
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                     {label}
@@ -290,6 +308,21 @@ export default function ProductAutocompleteSelect({
                         <div className="p-3 text-xs text-gray-400 text-center italic">
                             {inputValue ? 'No matching products found' : 'Type to search products'}
                         </div>
+                    )}
+
+                    {allowCustomText && inputValue.trim() && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                prevValueRef.current = '';
+                                onChange('', { name: inputValue.trim(), isCustom: true });
+                                setIsOpen(false);
+                            }}
+                            className="w-full text-left px-3.5 py-2.5 text-sm text-gray-700 bg-gray-50 hover:bg-gray-100 font-medium transition flex items-center gap-2"
+                        >
+                            <Plus size={15} className="text-gray-500" />
+                            <span>Use as custom description: <strong className="text-gray-900">"{inputValue.trim()}"</strong></span>
+                        </button>
                     )}
 
                     {inputValue.trim() && !hasExactMatch && (

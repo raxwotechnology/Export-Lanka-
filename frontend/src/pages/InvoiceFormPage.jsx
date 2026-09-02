@@ -14,6 +14,7 @@ import Textarea from '../components/ui/Textarea';
 import { customersApi } from '../features/customers/customersApi';
 import { productsApi } from '../features/products/productsApi';
 import { useCreateInvoice, useUpdateInvoice, useInvoice } from '../features/invoices/useInvoices';
+import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
 
 export default function InvoiceFormPage() {
     const { id } = useParams();
@@ -70,26 +71,34 @@ export default function InvoiceFormPage() {
     const customerOptions = (customersData?.data || []).map((c) => ({
         value: c._id, label: `${c.displayName} (${c.customerCode})`,
     }));
-    const productOptions = (productsData?.data || [])
-        .filter((p) => p.canBeSold !== false)
-        .map((p) => ({
-            value: p._id, label: `${p.name} — ${p.productCode}`,
-        }));
+    const products = useMemo(() => {
+        return (productsData?.data || []).filter((p) => p.canBeSold !== false);
+    }, [productsData]);
 
     const addItem = () => setItems([...items, { productName: '', quantity: 1, unitPrice: 0, taxRate: 18, taxable: true }]);
     const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
-    const updateItem = (idx, field, value) => {
+    const updateItem = (idx, field, value, selectedProduct = null) => {
         const newItems = [...items];
         newItems[idx] = { ...newItems[idx], [field]: value };
-        if (field === 'productId' && value) {
-            const p = productsData?.data?.find((x) => x._id === value);
-            if (p) {
-                newItems[idx].productName = p.name;
-                newItems[idx].productCode = p.productCode;
-                newItems[idx].unitPrice = p.basePrice || p.costs?.lastPurchaseCost || p.costs?.averageCost || 0;
-                newItems[idx].taxRate = p.tax?.taxRate || 0;
-                newItems[idx].taxable = p.tax?.taxable ?? true;
-                newItems[idx].unitOfMeasure = p.unitOfMeasure;
+        if (field === 'productId') {
+            if (value) {
+                const p = selectedProduct || products.find((x) => x._id === value);
+                if (p) {
+                    newItems[idx].productId = p._id;
+                    newItems[idx].productName = p.name;
+                    newItems[idx].productCode = p.productCode || '';
+                    newItems[idx].unitPrice = p.basePrice || p.costs?.lastPurchaseCost || p.costs?.averageCost || 0;
+                    newItems[idx].taxRate = p.tax?.taxRate ?? 18;
+                    newItems[idx].taxable = p.tax?.taxable ?? true;
+                    newItems[idx].unitOfMeasure = p.unitOfMeasure || '';
+                }
+            } else if (selectedProduct?.isCustom) {
+                newItems[idx].productId = '';
+                newItems[idx].productCode = '';
+                newItems[idx].productName = selectedProduct.name;
+            } else {
+                newItems[idx].productId = '';
+                newItems[idx].productCode = '';
             }
         }
         setItems(newItems);
@@ -200,11 +209,18 @@ export default function InvoiceFormPage() {
                                 const lTot = lSub + lTax;
                                 return (
                                     <div key={idx} className="border rounded-lg p-3">
-                                        <div className="flex gap-2 mb-2">
-                                            <span className="text-xs text-gray-500 mt-2 w-6">{idx + 1}</span>
+                                        <div className="flex gap-2 mb-2 items-start">
+                                            <span className="text-xs text-gray-500 mt-3 w-6">{idx + 1}</span>
                                             <div className="flex-1">
-                                                <Select placeholder="Product (or type below for service)..." options={productOptions}
-                                                    value={item.productId || ''} onChange={(e) => updateItem(idx, 'productId', e.target.value)} />
+                                                <ProductAutocompleteSelect
+                                                    placeholder="Type product name or code to search..."
+                                                    products={products}
+                                                    value={item.productId || ''}
+                                                    initialDisplayValue={item.productName || ''}
+                                                    productType="finished_good"
+                                                    allowCustomText={true}
+                                                    onChange={(val, selectedProd) => updateItem(idx, 'productId', val, selectedProd)}
+                                                />
                                             </div>
                                             <button type="button" onClick={() => removeItem(idx)} className="text-red-600 hover:bg-red-50 p-2 rounded mt-1">
                                                 <Trash2 size={14} />
