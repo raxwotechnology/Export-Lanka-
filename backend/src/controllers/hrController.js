@@ -209,8 +209,10 @@ export const getShifts = asyncHandler(async (req, res) => {
 });
 
 export const updateShift = asyncHandler(async (req, res) => {
-    const shift = await Shift.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const shift = await Shift.findById(req.params.id);
     if (!shift) { res.status(404); throw new Error('Shift not found'); }
+    Object.assign(shift, req.body);
+    await shift.save();
     res.json({ success: true, data: shift });
 });
 

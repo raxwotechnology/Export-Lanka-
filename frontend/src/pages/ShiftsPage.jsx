@@ -41,12 +41,43 @@ export default function ShiftsPage() {
         } catch { }
     };
 
+    const getWorkingHours = (r) => {
+        if (r.workingMinutes !== undefined && r.workingMinutes !== null && !isNaN(r.workingMinutes)) {
+            return (r.workingMinutes / 60).toFixed(1);
+        }
+        if (r.startTime && r.endTime) {
+            const [sh, sm] = r.startTime.split(':').map(Number);
+            const [eh, em] = r.endTime.split(':').map(Number);
+            let diff = (eh * 60 + (em || 0)) - (sh * 60 + (sm || 0));
+            if (diff < 0) diff += 24 * 60;
+            return (Math.max(0, diff - (r.breakMinutes || 0)) / 60).toFixed(1);
+        }
+        return '0.0';
+    };
+
+    const getFormWorkingCalc = () => {
+        if (!form.startTime || !form.endTime) return null;
+        const [sh, sm] = form.startTime.split(':').map(Number);
+        const [eh, em] = form.endTime.split(':').map(Number);
+        if (isNaN(sh) || isNaN(eh)) return null;
+        let totalMins = (eh * 60 + (em || 0)) - (sh * 60 + (sm || 0));
+        const isOvernight = totalMins < 0;
+        if (totalMins < 0) totalMins += 24 * 60;
+        const breakM = Math.max(0, +form.breakMinutes || 0);
+        const netWorkingM = Math.max(0, totalMins - breakM);
+        return {
+            totalHours: (totalMins / 60).toFixed(1),
+            netHours: (netWorkingM / 60).toFixed(1),
+            isOvernight
+        };
+    };
+
     const columns = [
         { key: 'name', label: 'Name', render: (r) => <span className="font-medium">{r.name}</span> },
         { key: 'code', label: 'Code' },
         { key: 'timing', label: 'Timing', render: (r) => `${r.startTime} - ${r.endTime}` },
         { key: 'break', label: 'Break', render: (r) => `${r.breakMinutes} min` },
-        { key: 'working', label: 'Working', render: (r) => `${(r.workingMinutes / 60).toFixed(1)} hrs` },
+        { key: 'working', label: 'Working', render: (r) => `${getWorkingHours(r)} hrs` },
         { key: 'grace', label: 'Grace', render: (r) => `${r.graceMinutes} min` },
         {
             key: 'actions', label: '', width: '100px', render: (r) => (
@@ -86,6 +117,16 @@ export default function ShiftsPage() {
                         <Input label="Grace (minutes late allowance)" type="number" min="0" value={form.graceMinutes}
                             onChange={(e) => setForm((f) => ({ ...f, graceMinutes: e.target.value }))} />
                     </div>
+                    {(() => {
+                        const calc = getFormWorkingCalc();
+                        if (!calc) return null;
+                        return (
+                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex justify-between items-center">
+                                <span>Total Shift Span: <strong>{calc.totalHours} hrs</strong> {calc.isOvernight && <span className="ml-1 text-indigo-700 font-semibold">(Overnight)</span>}</span>
+                                <span>Net Working: <strong>{calc.netHours} hrs</strong> {+form.breakMinutes > 0 ? `(${form.breakMinutes}m break)` : ''}</span>
+                            </div>
+                        );
+                    })()}
                 </div>
                 <div className="flex justify-end gap-2 px-6 py-4 border-t bg-gray-50">
                     <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>

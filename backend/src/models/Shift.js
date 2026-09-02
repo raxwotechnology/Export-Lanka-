@@ -14,13 +14,14 @@ const shiftSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 shiftSchema.pre('save', function () {
-    // Calculate working minutes (approximation — doesn't handle overnight precisely)
+    // Calculate working minutes and overnight flag
     if (this.startTime && this.endTime) {
         const [sh, sm] = this.startTime.split(':').map(Number);
         const [eh, em] = this.endTime.split(':').map(Number);
-        let diff = (eh * 60 + em) - (sh * 60 + sm);
-        if (diff < 0) diff += 24 * 60; // overnight
-        this.workingMinutes = Math.max(0, diff - (this.breakMinutes || 0));
+        let totalSpan = (eh * 60 + (em || 0)) - (sh * 60 + (sm || 0));
+        this.isOvernight = totalSpan < 0;
+        if (totalSpan < 0) totalSpan += 24 * 60; // overnight
+        this.workingMinutes = Math.max(0, totalSpan - (this.breakMinutes || 0));
     }
 });
 
