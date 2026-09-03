@@ -27,6 +27,7 @@ export default function InvoicesPage() {
     const { user } = useAuthStore();
     const canCreateManual = ['admin', 'super_admin', 'accountant'].includes(user?.role);
     const canCreateFromSO = ['admin', 'super_admin', 'accountant', 'sales_manager'].includes(user?.role);
+    const canCreate = canCreateFromSO || canCreateManual;
 
     const [filters, setFilters] = useState({
         search: '', paymentStatus: '', agingBucket: '',
