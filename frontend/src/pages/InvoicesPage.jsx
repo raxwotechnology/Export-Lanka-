@@ -25,7 +25,8 @@ const paymentStatusVariant = {
 export default function InvoicesPage() {
     const navigate = useNavigate();
     const { user } = useAuthStore();
-    const canCreate = ['admin', 'manager', 'accountant', 'sales_manager'].includes(user?.role);
+    const canCreateManual = ['admin', 'super_admin', 'accountant'].includes(user?.role);
+    const canCreateFromSO = ['admin', 'super_admin', 'accountant', 'sales_manager'].includes(user?.role);
 
     const [filters, setFilters] = useState({
         search: '', paymentStatus: '', agingBucket: '',
@@ -108,14 +109,18 @@ export default function InvoicesPage() {
             <PageHeader
                 title="Invoices"
                 description="Bill customers and track outstanding payments"
-                actions={canCreate && (
+                actions={(canCreateFromSO || canCreateManual) && (
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => navigate('/invoices/from-sales-order')}>
-                            From Sales Order
-                        </Button>
-                        <Button variant="primary" onClick={() => navigate('/invoices/new')}>
-                            <Plus size={16} className="mr-1.5" /> Manual Invoice
-                        </Button>
+                        {canCreateFromSO && (
+                            <Button variant="outline" onClick={() => navigate('/invoices/from-sales-order')}>
+                                From Sales Order
+                            </Button>
+                        )}
+                        {canCreateManual && (
+                            <Button variant="primary" onClick={() => navigate('/invoices/new')}>
+                                <Plus size={16} className="mr-1.5" /> Manual Invoice
+                            </Button>
+                        )}
                     </div>
                 )}
             />

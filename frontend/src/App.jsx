@@ -157,7 +157,7 @@ function App() {
         <Route path="/inventory/raw-materials" element={<ProtectedRoute requiredPermission="inventory.view"><RawMaterialsPage /></ProtectedRoute>} />
         <Route path="/inventory/converter" element={<ProtectedRoute requiredPermission="inventory.adjust"><InventoryConverterPage /></ProtectedRoute>} />
         <Route path="/invoices" element={<ProtectedRoute requiredPermission="invoices.view"><InvoicesPage /></ProtectedRoute>} />
-        <Route path="/invoices/new" element={<ProtectedRoute requiredPermission="invoices.create"><InvoiceFormPage /></ProtectedRoute>} />
+        <Route path="/invoices/new" element={<ProtectedRoute requiredPermission="invoices.create" excludeRoles={['factory_manager', 'warehouse_manager', 'sales_rep', 'sales_manager', 'production_staff', 'employee', 'cashier']}><InvoiceFormPage /></ProtectedRoute>} />
         <Route path="/invoices/from-sales-order" element={<ProtectedRoute requiredPermission="invoices.create"><InvoiceFromSalesOrderPage /></ProtectedRoute>} />
         <Route path="/invoices/:id" element={<ProtectedRoute requiredPermission="invoices.view"><InvoiceDetailPage /></ProtectedRoute>} />
         <Route path="/invoices/:id/edit" element={<ProtectedRoute requiredPermission="invoices.edit"><InvoiceFormPage /></ProtectedRoute>} />

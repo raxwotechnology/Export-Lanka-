@@ -1,7 +1,8 @@
 import Permission from '../models/Permission.js';
+import Role from '../models/Role.js';
 
 // ── Master permissions list ─────────────────────────────────────────────────
-const PERMISSIONS = [
+export const PERMISSIONS = [
     // Dashboard
     { code: 'dashboard.view', label: 'View Dashboard', module: 'dashboard', description: 'Access the main dashboard' },
 
@@ -101,154 +102,251 @@ const PERMISSIONS = [
     { code: 'admin.audit_logs', label: 'View Audit Logs', module: 'admin', description: 'View audit trail' },
 ];
 
-// ── Default permissions per role ────────────────────────────────────────────
-export const ROLE_PERMISSIONS = {
-    super_admin: ['*'], // wildcard = all permissions
-    admin: ['*'],
+// ── Default roles configuration list ─────────────────────────────────────────
+export const DEFAULT_ROLES = [
+    {
+        name: 'super_admin',
+        label: 'Super Admin',
+        description: 'Global system setup and root level access',
+        color: '#7f1d1d',
+        permissions: ['*'],
+        isSystem: true,
+    },
+    {
+        name: 'admin',
+        label: 'Administrator',
+        description: 'Full system management and configuration',
+        color: '#dc2626',
+        permissions: ['*'],
+        isSystem: true,
+    },
+    {
+        name: 'factory_manager',
+        label: 'Factory Manager',
+        description: 'Plant management, production, inventory & quality control',
+        color: '#d97706',
+        permissions: [
+            'dashboard.view',
+            'products.view', 'products.create', 'products.edit',
+            'categories.manage', 'brands.manage', 'uom.manage',
+            'inventory.view', 'inventory.adjust', 'inventory.transfer', 'inventory.opening',
+            'warehouses.manage',
+            'purchasing.view', 'purchasing.create', 'purchasing.edit', 'grn.manage',
+            'suppliers.view',
+            'bom.view', 'bom.manage',
+            'production.view', 'production.manage',
+            'damages.view', 'damages.manage',
+            'repairs.view', 'repairs.manage',
+            'reports.inventory', 'reports.production',
+        ],
+        isSystem: true,
+    },
+    {
+        name: 'warehouse_manager',
+        label: 'Warehouse Manager',
+        description: 'Full control over inventory, stock, and logistics',
+        color: '#ea580c',
+        permissions: [
+            'dashboard.view',
+            'products.view', 'products.create', 'products.edit',
+            'categories.manage', 'brands.manage', 'uom.manage',
+            'inventory.view', 'inventory.adjust', 'inventory.transfer', 'inventory.opening',
+            'warehouses.manage',
+            'purchasing.view', 'grn.manage',
+            'suppliers.view',
+            'damages.view', 'damages.manage',
+            'repairs.view', 'repairs.manage',
+            'supplier_returns.view', 'supplier_returns.manage',
+            'reports.inventory',
+        ],
+        isSystem: true,
+    },
+    {
+        name: 'sales_manager',
+        label: 'Sales Manager',
+        description: 'Manages sales team, CRM, and accounts receivable',
+        color: '#2563eb',
+        permissions: [
+            'dashboard.view',
+            'products.view',
+            'inventory.view',
+            'sales.view', 'sales.create', 'sales.edit', 'sales.approve', 'sales.delete',
+            'customers.view', 'customers.manage', 'customer_groups.manage',
+            'pos.access',
+            'invoices.view', 'invoices.create', 'invoices.edit',
+            'payments.view', 'payments.manage',
+            'credit_notes.view', 'credit_notes.manage',
+            'returns.view', 'returns.manage',
+            'reports.sales',
+        ],
+        isSystem: true,
+    },
+    {
+        name: 'hr_manager',
+        label: 'HR Manager',
+        description: 'Handles recruitment, payroll, and employee records',
+        color: '#c026d3',
+        permissions: [
+            'dashboard.view',
+            'hr.employees.view', 'hr.employees.manage',
+            'hr.departments.manage', 'hr.designations.manage',
+            'hr.shifts.manage',
+            'hr.attendance.view', 'hr.attendance.manage',
+            'hr.leaves.view', 'hr.leaves.manage',
+            'hr.holidays.manage',
+            'hr.salary.view', 'hr.salary.manage',
+            'hr.payroll.view', 'hr.payroll.manage',
+            'reports.hr',
+        ],
+        isSystem: true,
+    },
+    {
+        name: 'accountant',
+        label: 'Accountant',
+        description: 'Manages financial records, payables, and reports',
+        color: '#059669',
+        permissions: [
+            'dashboard.view',
+            'invoices.view', 'invoices.create', 'invoices.edit',
+            'bills.view', 'bills.manage',
+            'payments.view', 'payments.manage',
+            'credit_notes.view', 'credit_notes.manage',
+            'purchasing.view',
+            'sales.view',
+            'customers.view',
+            'suppliers.view',
+            'reports.sales', 'reports.financial',
+        ],
+        isSystem: true,
+    },
+    {
+        name: 'cashier',
+        label: 'Cashier / POS Operator',
+        description: 'Handles point-of-sale transactions and customer billing',
+        color: '#0891b2',
+        permissions: [
+            'dashboard.view',
+            'products.view',
+            'inventory.view',
+            'sales.view', 'sales.create',
+            'customers.view',
+            'pos.access',
+            'invoices.view', 'invoices.create',
+            'payments.view', 'payments.manage',
+        ],
+        isSystem: true,
+    },
+    {
+        name: 'employee',
+        label: 'Employee / Staff',
+        description: 'Standard self-service profile and shift attendance',
+        color: '#6b7280',
+        permissions: [
+            'dashboard.view',
+            'hr.attendance.view',
+            'hr.leaves.view',
+            'hr.payroll.view',
+        ],
+        isSystem: true,
+    },
+    {
+        name: 'sales_rep',
+        label: 'Sales Representative',
+        description: 'Sales order entry and field customer interactions',
+        color: '#3b82f6',
+        permissions: [
+            'dashboard.view',
+            'products.view',
+            'inventory.view',
+            'sales.view', 'sales.create', 'sales.edit',
+            'customers.view', 'customers.manage',
+            'pos.access',
+            'invoices.view',
+            'payments.view',
+            'returns.view', 'returns.manage',
+        ],
+        isSystem: true,
+    },
+    {
+        name: 'warehouse_staff',
+        label: 'Warehouse Staff',
+        description: 'Inventory handling, transfers and receiving',
+        color: '#f97316',
+        permissions: [
+            'dashboard.view',
+            'products.view',
+            'inventory.view', 'inventory.adjust', 'inventory.transfer',
+            'grn.manage',
+            'suppliers.view',
+            'damages.view', 'damages.manage',
+            'repairs.view',
+            'reports.inventory',
+        ],
+        isSystem: true,
+    },
+    {
+        name: 'production_staff',
+        label: 'Production Staff',
+        description: 'Plant operations and batch tracking',
+        color: '#eab308',
+        permissions: [
+            'dashboard.view',
+            'products.view',
+            'inventory.view',
+            'bom.view', 'bom.manage',
+            'production.view', 'production.manage',
+            'reports.production',
+        ],
+        isSystem: true,
+    },
+    {
+        name: 'staff',
+        label: 'General Staff',
+        description: 'General system user with baseline access',
+        color: '#475569',
+        permissions: [
+            'dashboard.view',
+        ],
+        isSystem: true,
+    },
+];
 
-    factory_manager: [
-        'dashboard.view',
-        'products.view', 'products.create', 'products.edit',
-        'categories.manage', 'brands.manage', 'uom.manage',
-        'inventory.view', 'inventory.adjust', 'inventory.transfer', 'inventory.opening',
-        'warehouses.manage',
-        'purchasing.view', 'purchasing.create', 'purchasing.edit', 'grn.manage',
-        'suppliers.view',
-        'bom.view', 'bom.manage',
-        'production.view', 'production.manage',
-        'damages.view', 'damages.manage',
-        'repairs.view', 'repairs.manage',
-        'reports.inventory', 'reports.production',
-    ],
-
-    warehouse_manager: [
-        'dashboard.view',
-        'products.view', 'products.create', 'products.edit',
-        'categories.manage', 'brands.manage', 'uom.manage',
-        'inventory.view', 'inventory.adjust', 'inventory.transfer', 'inventory.opening',
-        'warehouses.manage',
-        'purchasing.view', 'grn.manage',
-        'suppliers.view',
-        'damages.view', 'damages.manage',
-        'repairs.view', 'repairs.manage',
-        'supplier_returns.view', 'supplier_returns.manage',
-        'reports.inventory',
-    ],
-
-    sales_manager: [
-        'dashboard.view',
-        'products.view',
-        'inventory.view',
-        'sales.view', 'sales.create', 'sales.edit', 'sales.approve', 'sales.delete',
-        'customers.view', 'customers.manage', 'customer_groups.manage',
-        'pos.access',
-        'invoices.view', 'invoices.create', 'invoices.edit',
-        'payments.view', 'payments.manage',
-        'credit_notes.view', 'credit_notes.manage',
-        'returns.view', 'returns.manage',
-        'reports.sales',
-    ],
-
-    hr_manager: [
-        'dashboard.view',
-        'hr.employees.view', 'hr.employees.manage',
-        'hr.departments.manage', 'hr.designations.manage',
-        'hr.shifts.manage',
-        'hr.attendance.view', 'hr.attendance.manage',
-        'hr.leaves.view', 'hr.leaves.manage',
-        'hr.holidays.manage',
-        'hr.salary.view', 'hr.salary.manage',
-        'hr.payroll.view', 'hr.payroll.manage',
-        'reports.hr',
-    ],
-
-    accountant: [
-        'dashboard.view',
-        'invoices.view', 'invoices.create', 'invoices.edit',
-        'bills.view', 'bills.manage',
-        'payments.view', 'payments.manage',
-        'credit_notes.view', 'credit_notes.manage',
-        'purchasing.view',
-        'sales.view',
-        'customers.view',
-        'suppliers.view',
-        'reports.sales', 'reports.financial',
-    ],
-
-    cashier: [
-        'dashboard.view',
-        'products.view',
-        'inventory.view',
-        'sales.view', 'sales.create',
-        'customers.view',
-        'pos.access',
-        'invoices.view', 'invoices.create',
-        'payments.view', 'payments.manage',
-    ],
-
-    employee: [
-        'dashboard.view',
-        'hr.attendance.view',
-        'hr.leaves.view',
-        'hr.payroll.view',
-    ],
-
-    // Legacy role mappings (backward compatibility)
-    manager: ['*'],
-    sales_rep: [
-        'dashboard.view',
-        'products.view',
-        'inventory.view',
-        'sales.view', 'sales.create', 'sales.edit',
-        'customers.view', 'customers.manage',
-        'pos.access',
-        'invoices.view',
-        'payments.view',
-        'returns.view', 'returns.manage',
-    ],
-    warehouse_staff: [
-        'dashboard.view',
-        'products.view',
-        'inventory.view', 'inventory.adjust', 'inventory.transfer',
-        'grn.manage',
-        'suppliers.view',
-        'damages.view', 'damages.manage',
-        'repairs.view',
-        'reports.inventory',
-    ],
-    production_staff: [
-        'dashboard.view',
-        'products.view',
-        'inventory.view',
-        'bom.view', 'bom.manage',
-        'production.view', 'production.manage',
-        'reports.production',
-    ],
-    staff: [
-        'dashboard.view',
-    ],
-};
+// ── Default permissions per role mapping ────────────────────────────────────
+export const ROLE_PERMISSIONS = DEFAULT_ROLES.reduce((acc, r) => {
+    acc[r.name] = r.permissions;
+    return acc;
+}, {
+    manager: ['*'], // backward compatibility
+});
 
 // ── Seed function ───────────────────────────────────────────────────────────
 export async function seedPermissions() {
     try {
-        const existing = await Permission.countDocuments();
-        if (existing >= PERMISSIONS.length) {
+        const existingPerms = await Permission.countDocuments();
+        if (existingPerms < PERMISSIONS.length) {
+            // Upsert all permissions
+            const ops = PERMISSIONS.map((p) => ({
+                updateOne: {
+                    filter: { code: p.code },
+                    update: { $set: p },
+                    upsert: true,
+                },
+            }));
+            await Permission.bulkWrite(ops);
+            console.log(`✓ Seeded ${PERMISSIONS.length} permissions`);
+        } else {
             console.log('✓ Permissions already seeded, skipping');
-            return;
         }
 
-        // Upsert all permissions
-        const ops = PERMISSIONS.map((p) => ({
-            updateOne: {
-                filter: { code: p.code },
-                update: { $set: p },
-                upsert: true,
-            },
-        }));
-        await Permission.bulkWrite(ops);
-        console.log(`✓ Seeded ${PERMISSIONS.length} permissions`);
+        // Seed Roles in MongoDB if missing
+        for (const roleDef of DEFAULT_ROLES) {
+            const exists = await Role.findOne({ name: roleDef.name });
+            if (!exists) {
+                await Role.create(roleDef);
+            }
+        }
+        console.log(`✓ Verified ${DEFAULT_ROLES.length} system roles`);
     } catch (error) {
-        console.error('✗ Error seeding permissions:', error.message);
+        console.error('✗ Error seeding permissions/roles:', error.message);
     }
 }

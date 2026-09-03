@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { ROLES } from '../features/users/roleConfig';
 
@@ -10,6 +11,7 @@ import { ROLES } from '../features/users/roleConfig';
  */
 export const usePermission = () => {
     const user = useAuthStore((state) => state.user);
+    const queryClient = useQueryClient();
 
     if (!user) {
         return {
@@ -20,9 +22,19 @@ export const usePermission = () => {
         };
     }
 
-    // Get default permissions for the user's role
-    const roleConfig = ROLES.find((r) => r.value === user.role);
-    const rolePermissions = roleConfig ? roleConfig.permissions : [];
+    // Attempt to get dynamic roles from React Query cache first
+    const cachedRolesResponse = queryClient.getQueryData(['roles']);
+    const dynamicRoles = cachedRolesResponse?.data;
+    const dynamicRole = Array.isArray(dynamicRoles) ? dynamicRoles.find((r) => r.name === user.role) : null;
+
+    let rolePermissions = [];
+    if (dynamicRole && Array.isArray(dynamicRole.permissions)) {
+        rolePermissions = dynamicRole.permissions;
+    } else {
+        // Fallback to static role defaults
+        const roleConfig = ROLES.find((r) => r.value === user.role);
+        rolePermissions = roleConfig ? roleConfig.permissions : [];
+    }
     
     // User-specific permission overrides (from backend)
     const userPermissions = user.permissions || [];

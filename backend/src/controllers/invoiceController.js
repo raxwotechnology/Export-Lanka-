@@ -89,6 +89,13 @@ const updateCustomerBalance = async (customerId, session) => {
  * Create manual invoice
  */
 export const createInvoice = asyncHandler(async (req, res) => {
+    // Restrict manual invoice creation to Finance and Admin only
+    const allowedRoles = ['admin', 'super_admin', 'accountant', 'finance_manager'];
+    if (!allowedRoles.includes(req.user?.role)) {
+        res.status(403);
+        throw new Error('Access denied. Adding manual invoices is restricted to Finance and Admin only.');
+    }
+
     const { customerId, items, dueDate, ...rest } = req.body;
 
     const customer = await Customer.findById(customerId);
