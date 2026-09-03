@@ -15,6 +15,7 @@ import { customersApi } from '../features/customers/customersApi';
 import { productsApi } from '../features/products/productsApi';
 import { useCreateInvoice, useUpdateInvoice, useInvoice } from '../features/invoices/useInvoices';
 import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
+import CustomerAutocompleteSelect from '../components/ui/CustomerAutocompleteSelect';
 
 export default function InvoiceFormPage() {
     const { id } = useParams();
@@ -179,8 +180,14 @@ export default function InvoiceFormPage() {
                     <Card className="p-6">
                         <h3 className="text-sm font-semibold text-gray-700 mb-4">Customer & Dates</h3>
                         <div className="space-y-4">
-                            <Select label="Customer" required placeholder="Select customer..."
-                                options={customerOptions} value={customerId} onChange={(e) => setCustomerId(e.target.value)} />
+                            <CustomerAutocompleteSelect
+                                label="Customer"
+                                required
+                                placeholder="Type customer name, code or phone to search..."
+                                customers={customersData?.data || []}
+                                value={customerId}
+                                onChange={(val) => setCustomerId(val)}
+                            />
                             <div className="grid grid-cols-3 gap-4">
                                 <Input label="Invoice Date" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
                                 <Input label="Due Date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />

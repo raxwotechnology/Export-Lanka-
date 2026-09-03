@@ -160,8 +160,50 @@ customerSchema.index({ status: 1 });
 // Auto-generate code
 customerSchema.pre('save', async function () {
     if (this.isNew && !this.customerCode) {
-        const seq = await getNextSequence('customer');
-        this.customerCode = `CUST-${seq}`;
+        let candidateCode = '';
+        let isUnique = false;
+        let attempts = 0;
+
+        while (!isUnique && attempts < 50) {
+            attempts++;
+            const seq = await getNextSequence('customer');
+            candidateCode = `CUST-${seq}`;
+            // Check if this code already exists in DB (including soft-deleted records)
+            const exists = await this.constructor.findOne(
+                { customerCode: candidateCode },
+                null,
+                { includeDeleted: true }
+            );
+            if (!exists) {
+                isUnique = true;
+            }
+        }
+
+        // Fallback if sequence was lower than existing max custom codes
+        if (!isUnique) {
+            const allCustomers = await this.constructor.find(
+                {},
+                { customerCode: 1 },
+                { includeDeleted: true }
+            );
+            let maxSeq = 1000;
+            for (const c of allCustomers) {
+                if (c.customerCode) {
+                    const match = c.customerCode.match(/(\d+)/);
+                    if (match) {
+                        const num = parseInt(match[1], 10);
+                        if (!isNaN(num) && num > maxSeq) {
+                            maxSeq = num;
+                        }
+                    }
+                }
+            }
+            candidateCode = `CUST-${maxSeq + 1}`;
+            const Counter = (await import('./Counter.js')).default;
+            await Counter.findByIdAndUpdate('customer', { sequence: maxSeq + 1 }, { upsert: true });
+        }
+
+        this.customerCode = candidateCode;
     }
 
     // Auto-calc availableCredit

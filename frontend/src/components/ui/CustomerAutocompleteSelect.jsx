@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Search, X, UserCheck, Plus } from 'lucide-react';
 import api from '../../api/axios';
 import toast from 'react-hot-toast';
 
 export default function CustomerAutocompleteSelect({
     label,
-    placeholder,
+    placeholder = "Type customer name or code...",
     customers = [],
     value,
     onChange,
@@ -16,43 +17,27 @@ export default function CustomerAutocompleteSelect({
     const [isOpen, setIsOpen] = useState(false);
     const [localCustomers, setLocalCustomers] = useState([]);
     const wrapperRef = useRef(null);
-    const blurTimeoutRef = useRef(null);
 
     // Initialize/sync local list with prop
     useEffect(() => {
         setLocalCustomers(customers);
     }, [customers]);
 
-    const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
+    const isValidObjectId = (id) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
 
     // Sync input value with external value change
     useEffect(() => {
         if (isValidObjectId(value)) {
             const found = localCustomers.find(c => c._id === value);
             if (found) {
-                setInputValue(found.displayName);
-            }
-            if (blurTimeoutRef.current) {
-                clearTimeout(blurTimeoutRef.current);
+                setInputValue(`${found.displayName} (${found.customerCode || ''})`);
             }
         } else if (!value) {
             setInputValue('');
-            if (blurTimeoutRef.current) {
-                clearTimeout(blurTimeoutRef.current);
-            }
         } else {
             setInputValue(value);
         }
     }, [value, localCustomers]);
-
-    // Cleanup timeout on unmount
-    useEffect(() => {
-        return () => {
-            if (blurTimeoutRef.current) {
-                clearTimeout(blurTimeoutRef.current);
-            }
-        };
-    }, []);
 
     // Handle clicks outside of dropdown to close it
     useEffect(() => {
@@ -63,31 +48,34 @@ export default function CustomerAutocompleteSelect({
         }
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [wrapperRef]);
+    }, []);
 
+    const query = inputValue.toLowerCase().trim();
     const filtered = localCustomers.filter(c =>
-        c.displayName?.toLowerCase().includes(inputValue.toLowerCase()) ||
-        c.customerCode?.toLowerCase().includes(inputValue.toLowerCase()) ||
-        c.primaryContact?.phone?.toLowerCase().includes(inputValue.toLowerCase())
+        c.displayName?.toLowerCase().includes(query) ||
+        c.customerCode?.toLowerCase().includes(query) ||
+        c.primaryContact?.phone?.toLowerCase().includes(query) ||
+        c.companyName?.toLowerCase().includes(query)
     );
 
     const handleSelectOption = (customer) => {
-        if (blurTimeoutRef.current) {
-            clearTimeout(blurTimeoutRef.current);
-        }
-        setInputValue(customer.displayName);
+        setInputValue(`${customer.displayName} (${customer.customerCode || ''})`);
         onChange(customer._id, customer);
         setIsOpen(false);
     };
 
-    // Auto-create customer if it doesn't exist
+    const handleClear = (e) => {
+        e.stopPropagation();
+        setInputValue('');
+        onChange('', null);
+        setIsOpen(true);
+    };
+
+    // Auto-create customer if typed name doesn't exist
     const handleAutoCreate = async (nameToCreate) => {
         if (!nameToCreate.trim()) return;
-        if (blurTimeoutRef.current) {
-            clearTimeout(blurTimeoutRef.current);
-        }
 
-        // Parse name and phone
+        // Parse name and phone if present
         const match = nameToCreate.trim().match(/(\+?\d{8,14})/);
         let phone = '';
         let displayName = nameToCreate.trim();
@@ -102,7 +90,8 @@ export default function CustomerAutocompleteSelect({
         try {
             const payload = {
                 displayName,
-                legalName: displayName,
+                companyName: displayName,
+                customerType: 'company',
                 status: 'active',
                 primaryContact: phone ? {
                     phone,
@@ -118,102 +107,108 @@ export default function CustomerAutocompleteSelect({
             const res = await api.post('/customers', payload);
             if (res.data?.success && res.data?.data) {
                 const newCust = res.data.data;
-                toast.success(`Created customer: ${newCust.displayName}`);
-                
-                // Add to local state list
+                toast.success(`Created new customer: ${newCust.displayName}`);
                 setLocalCustomers(prev => [...prev, newCust]);
-                setInputValue(newCust.displayName);
+                setInputValue(`${newCust.displayName} (${newCust.customerCode || ''})`);
                 onChange(newCust._id, newCust);
                 onCreated?.(newCust);
+                setIsOpen(false);
             }
         } catch (err) {
             console.error('Customer auto-creation failed:', err.response?.data || err);
-            toast.error(err.response?.data?.message || 'Failed to auto-create new customer');
-        }
-    };
-
-    const handleBlur = () => {
-        if (blurTimeoutRef.current) {
-            clearTimeout(blurTimeoutRef.current);
-        }
-        blurTimeoutRef.current = setTimeout(() => {
-            if (!inputValue.trim()) {
-                onChange('');
-                return;
-            }
-            // Check if exactly matches an option
-            const exactMatch = localCustomers.find(c => c.displayName.toLowerCase() === inputValue.trim().toLowerCase());
-            if (exactMatch) {
-                setInputValue(exactMatch.displayName);
-                onChange(exactMatch._id, exactMatch);
-            } else {
-                // If it is a new name, auto-create it
-                handleAutoCreate(inputValue);
-            }
-        }, 250);
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (!inputValue.trim()) {
-                onChange('');
-                setIsOpen(false);
-                return;
-            }
-            const exactMatch = localCustomers.find(c => c.displayName.toLowerCase() === inputValue.trim().toLowerCase());
-            if (exactMatch) {
-                setInputValue(exactMatch.displayName);
-                onChange(exactMatch._id, exactMatch);
-                setIsOpen(false);
-            } else {
-                handleAutoCreate(inputValue);
-                setIsOpen(false);
-            }
+            toast.error(err.response?.data?.message || 'Failed to create new customer');
         }
     };
 
     return (
         <div ref={wrapperRef} className="relative w-full">
-            {label && <label className="block text-xs font-bold text-gray-600 mb-1">{label}</label>}
-            <div className="relative">
+            {label && (
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {label} {required && <span className="text-red-500">*</span>}
+                </label>
+            )}
+            <div className="relative flex items-center">
+                <Search size={16} className="absolute left-3 text-gray-400 pointer-events-none" />
                 <input
                     type="text"
-                    placeholder={placeholder || "Search or type to add..."}
+                    placeholder={placeholder}
                     value={inputValue}
                     onChange={(e) => {
                         const val = e.target.value;
                         setInputValue(val);
-                        onChange(val);
+                        if (!val) {
+                            onChange('', null);
+                        }
                         setIsOpen(true);
                     }}
                     onFocus={() => setIsOpen(true)}
-                    onBlur={handleBlur}
-                    onKeyDown={handleKeyDown}
                     disabled={disabled}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none bg-white font-medium"
+                    className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white outline-none transition"
                 />
+                {inputValue && !disabled && (
+                    <button
+                        type="button"
+                        onClick={handleClear}
+                        className="absolute right-2.5 p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                        title="Clear customer"
+                    >
+                        <X size={14} />
+                    </button>
+                )}
             </div>
+
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {filtered.map(c => (
-                        <button
-                            key={c._id}
-                            type="button"
-                            onMouseDown={() => handleSelectOption(c)}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition flex items-center justify-between"
-                        >
-                            <span className="font-medium text-gray-900">{c.displayName}</span>
-                            <span className="text-gray-400 text-xs font-mono">({c.customerCode}{c.primaryContact?.phone ? ` - ${c.primaryContact.phone}` : ''})</span>
-                        </button>
-                    ))}
-                    {inputValue.trim() && !localCustomers.some(c => c.displayName.toLowerCase() === inputValue.trim().toLowerCase()) && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-64 overflow-y-auto divide-y divide-gray-100 animate-fade-in">
+                    {filtered.length > 0 ? (
+                        filtered.map((c) => {
+                            const isCurrentSelected = c._id === value;
+                            return (
+                                <button
+                                    key={c._id}
+                                    type="button"
+                                    onMouseDown={() => handleSelectOption(c)}
+                                    className={`w-full text-left px-4 py-2.5 text-sm transition flex items-center justify-between cursor-pointer ${
+                                        isCurrentSelected
+                                            ? 'bg-primary-50 text-primary-900 font-semibold'
+                                            : 'hover:bg-gray-50 text-gray-800'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                            {c.displayName?.charAt(0)?.toUpperCase() || 'C'}
+                                        </div>
+                                        <div className="truncate">
+                                            <p className="font-medium text-gray-900 truncate">{c.displayName}</p>
+                                            {c.companyName && c.companyName !== c.displayName && (
+                                                <p className="text-xs text-gray-500 truncate">{c.companyName}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="text-right flex-shrink-0 pl-2">
+                                        <span className="text-xs font-mono font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                                            {c.customerCode}
+                                        </span>
+                                        {c.primaryContact?.phone && (
+                                            <p className="text-[11px] text-gray-400 mt-0.5">{c.primaryContact.phone}</p>
+                                        )}
+                                    </div>
+                                </button>
+                            );
+                        })
+                    ) : (
+                        <div className="px-4 py-3 text-xs text-gray-500 text-center">
+                            No matching customers found for "{inputValue}"
+                        </div>
+                    )}
+
+                    {inputValue.trim() && !localCustomers.some(c => c.displayName?.toLowerCase() === inputValue.trim().toLowerCase()) && (
                         <button
                             type="button"
                             onMouseDown={() => handleAutoCreate(inputValue)}
-                            className="w-full text-left px-4 py-2 text-sm text-primary-600 hover:bg-primary-50 font-semibold border-t border-gray-100 flex items-center gap-1.5"
+                            className="w-full text-left px-4 py-2.5 text-xs text-primary-700 hover:bg-primary-50 font-semibold flex items-center gap-2 transition"
                         >
-                            <span>+ Create new: "{inputValue.trim()}"</span>
+                            <Plus size={14} />
+                            <span>Create new customer "{inputValue.trim()}"</span>
                         </button>
                     )}
                 </div>

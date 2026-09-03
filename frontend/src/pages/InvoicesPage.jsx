@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Eye, FileText, AlertTriangle, Edit } from 'lucide-react';
+import { Plus, Search, Eye, FileText, AlertTriangle, Edit, CreditCard, Receipt } from 'lucide-react';
 
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
@@ -10,6 +10,7 @@ import Table from '../components/ui/Table';
 import Badge from '../components/ui/Badge';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
+import RecordPaymentModal from '../features/payments/RecordPaymentModal';
 import { useInvoices, useAgingSummary } from '../features/invoices/useInvoices';
 import { useAuthStore } from '../store/authStore';
 
@@ -33,6 +34,7 @@ export default function InvoicesPage() {
         search: '', paymentStatus: '', agingBucket: '',
         page: 1, limit: 15,
     });
+    const [paymentInvoice, setPaymentInvoice] = useState(null);
 
     const { data, isLoading } = useInvoices(filters);
     const { data: agingData } = useAgingSummary();
@@ -87,9 +89,9 @@ export default function InvoicesPage() {
             render: (r) => <Badge variant={paymentStatusVariant[r.paymentStatus]}>{r.paymentStatus.replace('_', ' ')}</Badge>,
         },
         {
-            key: 'actions', label: '', width: '80px',
+            key: 'actions', label: '', width: '110px',
             render: (r) => (
-                <div className="flex gap-1">
+                <div className="flex items-center gap-1">
                     <button onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${r._id}`); }}
                         className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded" title="View Details">
                         <Eye size={16} />
@@ -98,6 +100,15 @@ export default function InvoicesPage() {
                         <button onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${r._id}/edit`); }}
                             className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded" title="Edit Invoice">
                             <Edit size={16} />
+                        </button>
+                    )}
+                    {r.status !== 'cancelled' && r.balanceDue > 0 && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setPaymentInvoice(r); }}
+                            className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded flex items-center gap-1"
+                            title="Record Payment / Partial Payment"
+                        >
+                            <CreditCard size={16} />
                         </button>
                     )}
                 </div>
@@ -134,15 +145,21 @@ export default function InvoicesPage() {
                     { key: '31_60', label: '31-60 days', color: 'bg-orange-50 text-orange-700 border-orange-200' },
                     { key: '61_90', label: '61-90 days', color: 'bg-red-50 text-red-700 border-red-200' },
                     { key: '91_plus', label: '90+ days', color: 'bg-red-100 text-red-800 border-red-300' },
-                ].map((b) => (
-                    <button key={b.key}
-                        onClick={() => setFilters((f) => ({ ...f, agingBucket: b.key, page: 1 }))}
-                        className={`border rounded-lg p-3 text-left ${b.color} ${filters.agingBucket === b.key ? 'ring-2 ring-offset-1 ring-primary-500' : ''}`}>
-                        <p className="text-xs">{b.label}</p>
-                        <p className="text-lg font-bold">{fmt(aging.buckets?.[b.key] || 0)}</p>
-                        <p className="text-xs opacity-75">{aging.counts?.[b.key] || 0} invoices</p>
-                    </button>
-                ))}
+                ].map((b) => {
+                    const isSelected = filters.agingBucket === b.key;
+                    return (
+                        <button key={b.key}
+                            onClick={() => setFilters((f) => ({ ...f, agingBucket: isSelected ? '' : b.key, page: 1 }))}
+                            className={`border rounded-lg p-3 text-left transition-all cursor-pointer ${b.color} ${isSelected ? 'ring-2 ring-offset-1 ring-primary-500 shadow-sm font-semibold' : 'hover:opacity-90'}`}>
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs">{b.label}</p>
+                                {isSelected && <span className="text-[10px] bg-primary-100 text-primary-800 px-1 rounded">Filtered</span>}
+                            </div>
+                            <p className="text-lg font-bold mt-0.5">{fmt(aging.buckets?.[b.key] || 0)}</p>
+                            <p className="text-xs opacity-75">{aging.counts?.[b.key] || 0} invoices</p>
+                        </button>
+                    );
+                })}
             </div>
 
             <Card>
@@ -168,7 +185,7 @@ export default function InvoicesPage() {
                     </div>
                     {filters.agingBucket && (
                         <Button variant="outline" size="sm" onClick={() => setFilters((f) => ({ ...f, agingBucket: '', page: 1 }))}>
-                            Clear aging filter
+                            Clear aging filter ({filters.agingBucket})
                         </Button>
                     )}
                 </div>
@@ -176,10 +193,31 @@ export default function InvoicesPage() {
                 {isLoading ? (
                     <div className="py-16 text-center text-gray-500">Loading...</div>
                 ) : invoices.length === 0 ? (
-                    <EmptyState icon={FileText} title="No invoices" description="Generate invoices from sales orders or create manual ones"
-                        action={canCreate && <Button variant="primary" onClick={() => navigate('/invoices/from-sales-order')}>
-                            Generate from Sales Order
-                        </Button>} />
+                    filters.agingBucket || filters.search || filters.paymentStatus ? (
+                        <EmptyState
+                            icon={FileText}
+                            title="No matching invoices"
+                            description="No invoices match the currently active filter."
+                            action={
+                                <Button variant="outline" onClick={() => setFilters({ search: '', paymentStatus: '', agingBucket: '', page: 1, limit: 15 })}>
+                                    Clear Filters & View All Invoices
+                                </Button>
+                            }
+                        />
+                    ) : (
+                        <EmptyState
+                            icon={FileText}
+                            title="No invoices"
+                            description="Generate invoices from sales orders or create manual ones"
+                            action={
+                                canCreate && (
+                                    <Button variant="primary" onClick={() => navigate('/invoices/from-sales-order')}>
+                                        Generate from Sales Order
+                                    </Button>
+                                )
+                            }
+                        />
+                    )
                 ) : (
                     <>
                         <Table columns={columns} data={invoices} onRowClick={(r) => navigate(`/invoices/${r._id}`)} />
@@ -188,6 +226,12 @@ export default function InvoicesPage() {
                     </>
                 )}
             </Card>
+
+            <RecordPaymentModal
+                isOpen={!!paymentInvoice}
+                onClose={() => setPaymentInvoice(null)}
+                invoice={paymentInvoice}
+            />
         </div>
     );
 }

@@ -18,6 +18,7 @@ import { suppliersApi } from '../features/suppliers/suppliersApi';
 import { invoicesApi } from '../features/invoices/invoicesApi';
 import { billsApi } from '../features/bills/billsApi';
 import { useCreatePayment } from '../features/payments/usePayments';
+import CustomerAutocompleteSelect from '../components/ui/CustomerAutocompleteSelect';
 
 const fmt = (n) => new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 }).format(n || 0);
 
@@ -194,8 +195,14 @@ export default function PaymentFormPage() {
                             </div>
 
                             {direction === 'received' ? (
-                                <Select label="Customer" required placeholder="Select customer..."
-                                    options={customerOptions} value={customerId} onChange={(e) => { setCustomerId(e.target.value); setAllocations([]); }} />
+                                <CustomerAutocompleteSelect
+                                    label="Customer"
+                                    required
+                                    placeholder="Type customer name, code or phone to search..."
+                                    customers={customersData?.data || []}
+                                    value={customerId}
+                                    onChange={(val) => { setCustomerId(val); setAllocations([]); }}
+                                />
                             ) : (
                                 <Select label="Supplier" required placeholder="Select supplier..."
                                     options={supplierOptions} value={supplierId} onChange={(e) => { setSupplierId(e.target.value); setAllocations([]); }} />

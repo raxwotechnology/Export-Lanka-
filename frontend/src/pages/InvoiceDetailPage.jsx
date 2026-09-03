@@ -14,6 +14,7 @@ import { useRef } from 'react';
 import PrintableInvoice from '../components/print/PrintableInvoice';
 import { useQuery } from '@tanstack/react-query';
 import { paymentsApi } from '../features/payments/paymentsApi';
+import RecordPaymentModal from '../features/payments/RecordPaymentModal';
 
 const paymentStatusVariant = {
     unpaid: 'warning', partially_paid: 'info', paid: 'success',
@@ -26,6 +27,7 @@ export default function InvoiceDetailPage() {
     const { user } = useAuthStore();
     const [action, setAction] = useState(null);
     const [reason, setReason] = useState('');
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
 
     const { data, isLoading } = useInvoice(id);
     const changeStatus = useChangeInvoiceStatus();
@@ -102,7 +104,7 @@ export default function InvoiceDetailPage() {
                             </Button>
                         )}
                         {inv.balanceDue > 0 && inv.paymentStatus !== 'cancelled' && (
-                            <Button variant="outline" onClick={() => navigate(`/payments/new?invoiceId=${inv._id}`)}>
+                            <Button variant="outline" onClick={() => setShowPaymentModal(true)}>
                                 <Receipt size={16} className="mr-1.5" /> Record Payment
                             </Button>
                         )}
@@ -296,6 +298,12 @@ export default function InvoiceDetailPage() {
                     payments={payments}
                 />
             </div>
+
+            <RecordPaymentModal
+                isOpen={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                invoice={inv}
+            />
         </div>
     );
 }
