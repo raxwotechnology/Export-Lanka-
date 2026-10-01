@@ -1,0 +1,289 @@
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { Plus, Trash2, ArrowLeft, Save } from 'lucide-react';
+
+import PageHeader from '../components/ui/PageHeader';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import Select from '../components/ui/Select';
+import Input from '../components/ui/Input';
+import Textarea from '../components/ui/Textarea';
+
+import { customersApi } from '../features/customers/customersApi';
+import { productsApi } from '../features/products/productsApi';
+import { useCreateInvoice, useUpdateInvoice, useInvoice } from '../features/invoices/useInvoices';
+import ProductAutocompleteSelect from '../components/ui/ProductAutocompleteSelect';
+import CustomerAutocompleteSelect from '../components/ui/CustomerAutocompleteSelect';
+
+export default function InvoiceFormPage() {
+    const { id } = useParams();
+    const isEdit = !!id;
+    const navigate = useNavigate();
+
+    const createMutation = useCreateInvoice();
+    const updateMutation = useUpdateInvoice();
+    const { data: invoiceRes, isLoading: isInvoiceLoading } = useInvoice(id);
+
+    const [customerId, setCustomerId] = useState('');
+    const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [dueDate, setDueDate] = useState('');
+    const [invoiceType, setInvoiceType] = useState('standard');
+    const [notes, setNotes] = useState('');
+    const [paymentInstructions, setPaymentInstructions] = useState('');
+    const [shippingCost, setShippingCost] = useState(0);
+    const [items, setItems] = useState([{ productName: '', quantity: 1, unitPrice: 0, taxRate: 18, taxable: true }]);
+
+    const { data: customersData } = useQuery({
+        queryKey: ['customers', 'active'],
+        queryFn: () => customersApi.list({ status: 'active', limit: 0 }),
+    });
+    const { data: productsData } = useQuery({
+        queryKey: ['products', 'active'],
+        queryFn: () => productsApi.list({ status: 'active', limit: 0 }),
+    });
+
+    useEffect(() => {
+        if (isEdit && invoiceRes?.data) {
+            const inv = invoiceRes.data;
+            setCustomerId(inv.customerId?._id || inv.customerId || '');
+            if (inv.invoiceDate) setInvoiceDate(new Date(inv.invoiceDate).toISOString().split('T')[0]);
+            if (inv.dueDate) setDueDate(new Date(inv.dueDate).toISOString().split('T')[0]);
+            if (inv.invoiceType) setInvoiceType(inv.invoiceType);
+            setNotes(inv.notes || '');
+            setPaymentInstructions(inv.paymentInstructions || '');
+            setShippingCost(inv.shippingCost || 0);
+            if (inv.items?.length) {
+                setItems(inv.items.map(item => ({
+                    productId: item.productId?._id || item.productId || '',
+                    productCode: item.productCode || '',
+                    productName: item.productName || '',
+                    quantity: item.quantity || 1,
+                    unitOfMeasure: item.unitOfMeasure || '',
+                    unitPrice: item.unitPrice || 0,
+                    taxRate: item.taxRate || 0,
+                    taxable: item.taxable ?? true,
+                })));
+            }
+        }
+    }, [isEdit, invoiceRes]);
+
+    const customerOptions = (customersData?.data || []).map((c) => ({
+        value: c._id, label: `${c.displayName} (${c.customerCode})`,
+    }));
+    const products = useMemo(() => {
+        return (productsData?.data || []).filter((p) => p.canBeSold !== false);
+    }, [productsData]);
+
+    const addItem = () => setItems([...items, { productName: '', quantity: 1, unitPrice: 0, taxRate: 18, taxable: true }]);
+    const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
+    const updateItem = (idx, field, value, selectedProduct = null) => {
+        const newItems = [...items];
+        newItems[idx] = { ...newItems[idx], [field]: value };
+        if (field === 'productId') {
+            if (value) {
+                const p = selectedProduct || products.find((x) => x._id === value);
+                if (p) {
+                    newItems[idx].productId = p._id;
+                    newItems[idx].productName = p.name;
+                    newItems[idx].productCode = p.productCode || '';
+                    newItems[idx].unitPrice = p.basePrice || p.costs?.lastPurchaseCost || p.costs?.averageCost || 0;
+                    newItems[idx].taxRate = p.tax?.taxRate ?? 18;
+                    newItems[idx].taxable = p.tax?.taxable ?? true;
+                    newItems[idx].unitOfMeasure = p.unitOfMeasure || '';
+                }
+            } else if (selectedProduct?.isCustom) {
+                newItems[idx].productId = '';
+                newItems[idx].productCode = '';
+                newItems[idx].productName = selectedProduct.name;
+            } else {
+                newItems[idx].productId = '';
+                newItems[idx].productCode = '';
+            }
+        }
+        setItems(newItems);
+    };
+
+    const totals = useMemo(() => {
+        let sub = 0, tax = 0;
+        items.forEach((i) => {
+            const q = +i.quantity || 0;
+            const p = +i.unitPrice || 0;
+            const lSub = q * p;
+            const lTax = i.taxable ? lSub * (+i.taxRate || 0) / 100 : 0;
+            sub += lSub; tax += lTax;
+        });
+        const grand = sub + tax + (+shippingCost || 0);
+        return { sub: +sub.toFixed(2), tax: +tax.toFixed(2), grand: +grand.toFixed(2) };
+    }, [items, shippingCost]);
+
+    const fmt = (n) => new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 2 }).format(n || 0);
+
+    const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+    const submit = async () => {
+        if (!customerId) { toast.error('Select customer'); return; }
+        if (items.length === 0 || items.some((i) => !i.productName || !i.quantity)) {
+            toast.error('All items need a name and quantity');
+            return;
+        }
+
+        const payload = {
+            customerId,
+            invoiceType,
+            invoiceDate,
+            dueDate: dueDate || undefined,
+            items: items.map((i) => ({
+                productId: i.productId || undefined,
+                productCode: i.productCode || undefined,
+                productName: i.productName,
+                quantity: +i.quantity,
+                unitOfMeasure: i.unitOfMeasure || undefined,
+                unitPrice: +i.unitPrice,
+                taxRate: +i.taxRate || 0,
+                taxable: i.taxable,
+            })),
+            shippingCost: +shippingCost || 0,
+            notes: notes || undefined,
+            paymentInstructions: paymentInstructions || undefined,
+        };
+
+        try {
+            if (isEdit) {
+                const result = await updateMutation.mutateAsync({ id, data: payload });
+                navigate(`/invoices/${result.data._id || id}`);
+            } else {
+                const result = await createMutation.mutateAsync({
+                    ...payload,
+                    status: 'approved',
+                });
+                navigate(`/invoices/${result.data._id}`);
+            }
+        } catch { }
+    };
+
+    if (isEdit && isInvoiceLoading) {
+        return <div className="p-8 text-center text-gray-500">Loading invoice details...</div>;
+    }
+
+    return (
+        <div>
+            <PageHeader title="Manual Invoice"
+                description="Create an invoice without a sales order (services, miscellaneous)"
+                actions={<Button variant="outline" onClick={() => navigate('/invoices')}>
+                    <ArrowLeft size={16} className="mr-1.5" /> Back
+                </Button>} />
+
+            <div className="grid grid-cols-3 gap-6">
+                <div className="col-span-2 space-y-6">
+                    <Card className="p-6">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Customer & Dates</h3>
+                        <div className="space-y-4">
+                            <CustomerAutocompleteSelect
+                                label="Customer"
+                                required
+                                placeholder="Type customer name, code or phone to search..."
+                                customers={customersData?.data || []}
+                                value={customerId}
+                                onChange={(val) => setCustomerId(val)}
+                            />
+                            <div className="grid grid-cols-3 gap-4">
+                                <Input label="Invoice Date" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+                                <Input label="Due Date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                                <Select label="Type"
+                                    options={[
+                                        { value: 'standard', label: 'Standard' },
+                                        { value: 'proforma', label: 'Proforma' },
+                                        { value: 'service', label: 'Service' },
+                                    ]}
+                                    value={invoiceType} onChange={(e) => setInvoiceType(e.target.value)} />
+                            </div>
+                        </div>
+                    </Card>
+
+                    <Card className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold text-gray-700">Line Items</h3>
+                            <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                                <Plus size={14} className="mr-1" /> Add Item
+                            </Button>
+                        </div>
+                        <div className="space-y-3">
+                            {items.map((item, idx) => {
+                                const lSub = (+item.quantity || 0) * (+item.unitPrice || 0);
+                                const lTax = item.taxable ? lSub * (+item.taxRate || 0) / 100 : 0;
+                                const lTot = lSub + lTax;
+                                return (
+                                    <div key={idx} className="border rounded-lg p-3">
+                                        <div className="flex gap-2 mb-2 items-start">
+                                            <span className="text-xs text-gray-500 mt-3 w-6">{idx + 1}</span>
+                                            <div className="flex-1">
+                                                <ProductAutocompleteSelect
+                                                    placeholder="Type product name or code to search..."
+                                                    products={products}
+                                                    value={item.productId || ''}
+                                                    initialDisplayValue={item.productName || ''}
+                                                    productType="finished_good"
+                                                    allowCustomText={true}
+                                                    onChange={(val, selectedProd) => updateItem(idx, 'productId', val, selectedProd)}
+                                                />
+                                            </div>
+                                            <button type="button" onClick={() => removeItem(idx)} className="text-red-600 hover:bg-red-50 p-2 rounded mt-1">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                        <Input label="Description / Name" required
+                                            value={item.productName} onChange={(e) => updateItem(idx, 'productName', e.target.value)} />
+                                        <div className="grid grid-cols-4 gap-2 mt-2">
+                                            <Input label="Qty" type="number" step="0.01" min="0.01"
+                                                value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', e.target.value)} />
+                                            <Input label="Unit Price" type="number" step="0.01" min="0"
+                                                value={item.unitPrice} onChange={(e) => updateItem(idx, 'unitPrice', e.target.value)} />
+                                            <Input label="Tax %" type="number" step="0.01" min="0"
+                                                value={item.taxRate} onChange={(e) => updateItem(idx, 'taxRate', e.target.value)} />
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Total</label>
+                                                <p className="px-3 py-2 bg-gray-50 rounded-lg text-sm font-medium">{fmt(lTot)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </Card>
+
+                    <Card className="p-6">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Notes</h3>
+                        <div className="space-y-4">
+                            <Textarea label="Invoice Notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+                            <Textarea label="Payment Instructions" rows={2} value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} />
+                        </div>
+                    </Card>
+                </div>
+
+                <div>
+                    <Card className="p-6 sticky top-6">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-4">Summary</h3>
+                        <div className="space-y-3 text-sm">
+                            <div className="flex justify-between"><span className="text-gray-600">Subtotal</span><span>{fmt(totals.sub)}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-600">Tax</span><span>{fmt(totals.tax)}</span></div>
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-gray-600">Shipping</span>
+                                <input type="number" step="0.01" min="0" value={shippingCost} onChange={(e) => setShippingCost(e.target.value)}
+                                    className="w-28 px-2 py-1 border border-gray-300 rounded text-sm text-right" />
+                            </div>
+                            <div className="flex justify-between pt-3 border-t font-bold">
+                                <span>Total</span><span className="text-primary-600">{fmt(totals.grand)}</span>
+                            </div>
+                        </div>
+                        <Button variant="primary" fullWidth className="mt-6" onClick={submit} loading={isSubmitting}
+                            disabled={!customerId || items.length === 0}>
+                            <Save size={16} className="mr-1.5" /> {isEdit ? 'Update Invoice' : 'Create Invoice'}
+                        </Button>
+                    </Card>
+                </div>
+            </div>
+        </div>
+    );
+}

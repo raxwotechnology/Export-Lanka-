@@ -1,0 +1,511 @@
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { AlertTriangle, ShieldCheck } from 'lucide-react';
+
+import Modal from '../../components/ui/Modal';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
+import Textarea from '../../components/ui/Textarea';
+import { productFormSchema } from './productSchemas';
+import { useCategories, useBrands, useUoms, useCreateProduct, useUpdateProduct } from './useProducts';
+import { productsApi } from './productsApi';
+import { useAuthStore } from '../../store/authStore';
+
+const tabs = [
+    { id: 'basic', label: 'Basic Info' },
+    { id: 'pricing', label: 'Pricing & Tax' },
+    { id: 'stock', label: 'Stock & Packaging' },
+    { id: 'sales', label: 'Sales Config' },
+];
+
+export default function ProductFormModal({ isOpen, onClose, product = null, forceProductType = null }) {
+    const { user } = useAuthStore();
+    const [activeTab, setActiveTab] = useState('basic');
+    const isEdit = !!product;
+    const isFactoryManager = user?.role === 'factory_manager';
+    const editCount = Number(product?.editCount) || 0;
+    const isEditBlocked = isEdit && isFactoryManager && editCount >= 2;
+
+    const { data: categoriesData } = useCategories();
+    const { data: brandsData } = useBrands();
+    const { data: uomsData } = useUoms();
+    const createProduct = useCreateProduct();
+    const updateProduct = useUpdateProduct();
+
+    const {
+        register,
+        handleSubmit,
+        reset,
+        setValue,
+        watch,
+        formState: { errors },
+    } = useForm({
+        resolver: zodResolver(productFormSchema),
+        defaultValues: {
+            productCode: '',
+            productShortCode: '',
+            type: 'trading',
+            status: 'inactive',
+            taxable: true,
+            taxRate: 18,
+            sellable: true,
+            allowBackorder: false,
+            minimumOrderQuantity: 1,
+            basePrice: 0,
+        },
+    });
+
+    // When opening in edit mode, populate form
+    useEffect(() => {
+        if (isOpen && product) {
+            reset({
+                productCode: product.productCode || '',
+                productShortCode: product.productShortCode || '',
+                name: product.name || '',
+                shortName: product.shortName || '',
+                sku: product.sku || '',
+                barcode: product.barcode || '',
+                productType: product.productType || 'finished_good',
+                canBeSold: product.canBeSold ?? true,
+                canBePurchased: product.canBePurchased ?? true,
+                canBeManufactured: product.canBeManufactured ?? false,
+                description: product.description || '',
+                categoryId: product.categoryId?._id || product.categoryId || '',
+                brandId: product.brandId?._id || product.brandId || '',
+                type: product.type || 'trading',
+                unitOfMeasure: product.unitOfMeasure || '',
+                basePrice: product.basePrice || 0,
+                mrp: product.mrp || 0,
+                taxable: product.tax?.taxable ?? true,
+                taxRate: product.tax?.taxRate ?? 18,
+                hsCode: product.tax?.hsCode || '',
+                minimumLevel: product.stockLevels?.minimumLevel || 0,
+                reorderLevel: product.stockLevels?.reorderLevel || 0,
+                maximumLevel: product.stockLevels?.maximumLevel || 0,
+                unitsPerCarton: product.packaging?.unitsPerCarton || 0,
+                cartonsPerPallet: product.packaging?.cartonsPerPallet || 0,
+                minimumOrderQuantity: product.salesConfig?.minimumOrderQuantity || 1,
+                sellable: product.salesConfig?.sellable ?? true,
+                allowBackorder: product.salesConfig?.allowBackorder ?? false,
+                status: product.status || 'active',
+                notes: product.notes || '',
+                subCategoriesStr: (product.subCategories || []).join(', '),
+            });
+        } else if (isOpen && !product) {
+            const rawCat = forceProductType === 'raw_material' && categoriesData?.data
+                ? categoriesData.data.find(c => c.code === 'RAW' || c.name === 'Raw Material')
+                : null;
+
+            // Reset to defaults when creating new
+            reset({
+                productCode: '',
+                productShortCode: '',
+                type: 'trading',
+                status: 'inactive',
+                taxable: true,
+                taxRate: 18,
+                sellable: forceProductType === 'raw_material' ? false : true,
+                allowBackorder: false,
+                minimumOrderQuantity: 1,
+                productType: forceProductType || 'finished_good',
+                categoryId: rawCat ? rawCat._id : '',
+                basePrice: 0,
+                subCategoriesStr: '',
+            });
+        }
+        setActiveTab('basic');
+    }, [isOpen, product, reset, forceProductType, categoriesData]);
+
+    const selectedCategoryId = watch('categoryId');
+    const selectedProductShortCode = watch('productShortCode');
+    const [isLoadingCode, setIsLoadingCode] = useState(false);
+
+    useEffect(() => {
+        if (!isEdit && isOpen && selectedCategoryId && selectedProductShortCode && selectedProductShortCode.length === 3) {
+            const fetchNextCode = async () => {
+                setIsLoadingCode(true);
+                try {
+                    const response = await productsApi.getNextCode(selectedCategoryId, selectedProductShortCode);
+                    if (response?.success && response?.productCode) {
+                        setValue('productCode', response.productCode);
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch next product code:', err);
+                } finally {
+                    setIsLoadingCode(false);
+                }
+            };
+            fetchNextCode();
+        } else if (!isEdit && isOpen && (!selectedCategoryId || !selectedProductShortCode || selectedProductShortCode.length !== 3)) {
+            setValue('productCode', '');
+        }
+    }, [selectedCategoryId, selectedProductShortCode, isEdit, isOpen, setValue]);
+
+    const onInvalid = (errors) => {
+        console.error('Product validation failed:', errors);
+        const errorList = Object.values(errors).map((err) => err.message);
+        if (errorList.length > 0) {
+            toast.error(`Validation error: ${errorList.join(', ')}`);
+        }
+    };
+
+    const onSubmit = async (data) => {
+        const rawCat = forceProductType === 'raw_material' && categoriesData?.data
+            ? categoriesData.data.find(c => c.code === 'RAW' || c.name === 'Raw Material')
+            : null;
+
+        // Transform flat form data back into nested structure for API
+        const payload = {
+            productCode: data.productCode || undefined,
+            productShortCode: data.productShortCode || undefined,
+            name: data.name,
+            shortName: data.shortName || undefined,
+            sku: data.sku || undefined,
+            barcode: data.barcode || undefined,
+            productType: forceProductType || data.productType,
+            canBeSold: forceProductType === 'raw_material' ? false : data.canBeSold,
+            canBePurchased: forceProductType === 'raw_material' ? true : data.canBePurchased,
+            canBeManufactured: data.canBeManufactured,
+            description: data.description || undefined,
+            subCategories: data.subCategoriesStr
+                ? data.subCategoriesStr.split(',').map((s) => s.trim()).filter(Boolean)
+                : [],
+            categoryId: rawCat ? rawCat._id : data.categoryId,
+            brandId: data.brandId || undefined,
+            type: data.type,
+            unitOfMeasure: data.unitOfMeasure,
+            basePrice: data.basePrice,
+            mrp: data.mrp || undefined,
+            tax: {
+                taxable: data.taxable,
+                taxRate: data.taxRate || 0,
+                hsCode: data.hsCode || undefined,
+            },
+            stockLevels: {
+                minimumLevel: data.minimumLevel || 0,
+                reorderLevel: data.reorderLevel || 0,
+                maximumLevel: data.maximumLevel || 0,
+            },
+            packaging: {
+                unitsPerCarton: data.unitsPerCarton || 0,
+                cartonsPerPallet: data.cartonsPerPallet || 0,
+            },
+            salesConfig: {
+                minimumOrderQuantity: data.minimumOrderQuantity || 1,
+                sellable: forceProductType === 'raw_material' ? false : data.sellable,
+                allowBackorder: data.allowBackorder,
+            },
+            status: data.status || 'active',
+            notes: data.notes || undefined,
+        };
+
+        try {
+            if (isEdit) {
+                await updateProduct.mutateAsync({ id: product._id, data: payload });
+            } else {
+                await createProduct.mutateAsync(payload);
+            }
+            onClose();
+        } catch (err) {
+            // Errors already toasted via hook
+        }
+    };
+
+    const productTypeOptions = forceProductType === 'raw_material'
+        ? [{ value: 'raw_material', label: 'Raw Material (for production)' }]
+        : [
+            { value: 'finished_good', label: 'Finished Good (sellable)' },
+            { value: 'semi_finished', label: 'Semi-Finished (intermediate)' },
+            { value: 'packaging', label: 'Packaging Material' },
+            { value: 'consumable', label: 'Consumable' },
+            { value: 'service', label: 'Service' },
+        ];
+
+    const categoryOptions = (categoriesData?.data || []).map((c) => ({
+        value: c._id,
+        label: `${c.name} (${c.code})`,
+    }));
+    const brandOptions = (brandsData?.data || []).map((b) => ({
+        value: b._id,
+        label: b.name,
+    }));
+    const uomOptions = (uomsData?.data || []).map((u) => ({
+        value: u.symbol,
+        label: `${u.name} (${u.symbol})`,
+    }));
+
+    const isLoading = createProduct.isPending || updateProduct.isPending;
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={isEdit ? `Edit Product — ${product?.productCode}` : (forceProductType === 'raw_material' ? 'Create Raw Material' : 'Create New Product')}
+            size="xl"
+        >
+            <form onSubmit={handleSubmit(onSubmit, onInvalid)}>
+                {/* Factory Manager Edit Restriction Banner */}
+                {isEdit && isFactoryManager && (
+                    <div className={`mx-6 mt-4 p-3 rounded-xl border flex items-center gap-3 ${
+                        isEditBlocked 
+                            ? 'bg-rose-50 border-rose-200 text-rose-800' 
+                            : 'bg-amber-50 border-amber-200 text-amber-800'
+                    }`}>
+                        {isEditBlocked ? <AlertTriangle size={18} className="text-rose-600 flex-shrink-0" /> : <ShieldCheck size={18} className="text-amber-600 flex-shrink-0" />}
+                        <div className="text-xs">
+                            <span className="font-bold block">
+                                {isEditBlocked ? 'Edit Limit Reached (2/2 edits used)' : `Factory Manager Edit Limit (${editCount}/2 edits used)`}
+                            </span>
+                            <span>
+                                {isEditBlocked 
+                                    ? 'You have reached the maximum allowed 2 edits for this record. Further updates are locked.'
+                                    : `You can edit this product ${2 - editCount} more time${2 - editCount === 1 ? '' : 's'}.`}
+                            </span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Tabs */}
+                <div className="border-b border-gray-200">
+                    <div className="flex gap-1 px-6">
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-4 py-3 text-sm font-medium border-b-2 transition ${activeTab === tab.id
+                                    ? 'border-primary-600 text-primary-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Tab Content */}
+                <div className="p-6">
+                    {activeTab === 'basic' && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-4 gap-4">
+                                <Input
+                                    label="Short Code (e.g. MOR)"
+                                    maxLength={3}
+                                    placeholder="3 letters"
+                                    disabled={isEdit}
+                                    required
+                                    error={errors.productShortCode?.message}
+                                    {...register('productShortCode')}
+                                />
+                                <Input
+                                    label="Product Code"
+                                    disabled
+                                    placeholder={isLoadingCode ? "Generating..." : "Auto-generated after category selection"}
+                                    error={errors.productCode?.message}
+                                    {...register('productCode')}
+                                />
+                                <Input label="Product Name" required error={errors.name?.message} {...register('name')} />
+                                <Input label="Short Name" error={errors.shortName?.message} {...register('shortName')} />
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                                <Input label="SKU" error={errors.sku?.message} {...register('sku')} />
+                                <Input label="Barcode" error={errors.barcode?.message} {...register('barcode')} />
+                                <Select
+                                    label="Type"
+                                    required
+                                    error={errors.type?.message}
+                                    options={[
+                                        { value: 'trading', label: 'Trading (buy & sell)' },
+                                        { value: 'manufactured', label: 'Manufactured' },
+                                        { value: 'service', label: 'Service' },
+                                        { value: 'bundle', label: 'Bundle' },
+                                    ]}
+                                    {...register('type')}
+                                />
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                                <Select
+                                    label="Category"
+                                    required
+                                    disabled={forceProductType === 'raw_material'}
+                                    error={errors.categoryId?.message}
+                                    options={categoryOptions}
+                                    {...register('categoryId')}
+                                />
+                                <Select
+                                    label="Brand"
+                                    error={errors.brandId?.message}
+                                    options={brandOptions}
+                                    {...register('brandId')}
+                                />
+                                <Select
+                                    label="Product Type" required
+                                    disabled={forceProductType === 'raw_material'}
+                                    options={productTypeOptions}
+                                    error={errors.productType?.message}
+                                    {...register('productType')}
+                                />
+                            </div>
+                            <div>
+                                <Input
+                                    label="Sub-Categories / Forms / Grades (comma-separated)"
+                                    placeholder="e.g. Powder, Cut Leaves, Tea Bag Cut, Seeds, Alba Grade"
+                                    {...register('subCategoriesStr')}
+                                />
+                                <p className="text-[11px] text-gray-500 mt-1">
+                                    Define available forms or grades for this product so sales officers can select them directly in Sales Orders.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <Select
+                                    label="Unit of Measure"
+                                    required
+                                    error={errors.unitOfMeasure?.message}
+                                    options={uomOptions}
+                                    {...register('unitOfMeasure')}
+                                />
+                                <Select
+                                    label="Status"
+                                    required
+                                    error={errors.status?.message}
+                                    options={[
+                                        { value: 'active', label: 'Active' },
+                                        { value: 'inactive', label: 'Inactive' },
+                                        { value: 'draft', label: 'Draft' },
+                                        { value: 'discontinued', label: 'Discontinued' },
+                                    ]}
+                                    {...register('status')}
+                                />
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 pt-2 border-t">
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" {...register('canBeSold')} />
+                                    Can be sold
+                                </label>
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" {...register('canBePurchased')} />
+                                    Can be purchased
+                                </label>
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" {...register('canBeManufactured')} />
+                                    Can be manufactured
+                                </label>
+                            </div>
+                            <Textarea label="Description" rows={3} error={errors.description?.message} {...register('description')} />
+                            <Textarea label="Internal Notes" rows={2} error={errors.notes?.message} {...register('notes')} />
+                        </div>
+                    )}
+
+                    {activeTab === 'pricing' && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Base Price (LKR)"
+                                    type="number"
+                                    step="0.01"
+                                    required
+                                    error={errors.basePrice?.message}
+                                    {...register('basePrice')}
+                                />
+                                <Input
+                                    label="MRP (LKR)"
+                                    type="number"
+                                    step="0.01"
+                                    error={errors.mrp?.message}
+                                    {...register('mrp')}
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input type="checkbox" id="taxable" {...register('taxable')} />
+                                <label htmlFor="taxable" className="text-sm text-gray-700">Taxable (VAT applicable)</label>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Tax Rate (%)"
+                                    type="number"
+                                    step="0.01"
+                                    error={errors.taxRate?.message}
+                                    {...register('taxRate')}
+                                />
+                                <Input label="HS Code" error={errors.hsCode?.message} {...register('hsCode')} />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'stock' && (
+                        <div className="space-y-4">
+                            <h4 className="text-sm font-semibold text-gray-700">Stock Levels</h4>
+                            <div className="grid grid-cols-3 gap-4">
+                                <Input
+                                    label="Minimum Level"
+                                    type="number"
+                                    error={errors.minimumLevel?.message}
+                                    {...register('minimumLevel')}
+                                />
+                                <Input
+                                    label="Reorder Level"
+                                    type="number"
+                                    error={errors.reorderLevel?.message}
+                                    {...register('reorderLevel')}
+                                />
+                                <Input
+                                    label="Maximum Level"
+                                    type="number"
+                                    error={errors.maximumLevel?.message}
+                                    {...register('maximumLevel')}
+                                />
+                            </div>
+                            <h4 className="text-sm font-semibold text-gray-700 pt-4">Packaging</h4>
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Units per Carton"
+                                    type="number"
+                                    error={errors.unitsPerCarton?.message}
+                                    {...register('unitsPerCarton')}
+                                />
+                                <Input
+                                    label="Cartons per Pallet"
+                                    type="number"
+                                    error={errors.cartonsPerPallet?.message}
+                                    {...register('cartonsPerPallet')}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'sales' && (
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <input type="checkbox" id="sellable" {...register('sellable')} />
+                                <label htmlFor="sellable" className="text-sm text-gray-700">Sellable (can be added to sales orders)</label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input type="checkbox" id="allowBackorder" {...register('allowBackorder')} />
+                                <label htmlFor="allowBackorder" className="text-sm text-gray-700">Allow backorder when out of stock</label>
+                            </div>
+                            <Input
+                                label="Minimum Order Quantity"
+                                type="number"
+                                error={errors.minimumOrderQuantity?.message}
+                                {...register('minimumOrderQuantity')}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 bg-gray-50">
+                    <Button variant="outline" onClick={onClose} type="button" disabled={isLoading}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" variant="primary" loading={isLoading} disabled={isLoading || isEditBlocked}>
+                        {isEdit ? 'Update Product' : (forceProductType === 'raw_material' ? 'Create Raw Material' : 'Create Product')}
+                    </Button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
