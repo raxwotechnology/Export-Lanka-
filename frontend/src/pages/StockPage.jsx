@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Boxes, AlertTriangle, PackagePlus, ArrowRightLeft, Settings2, History, Edit, Trash2, Sliders } from 'lucide-react';
+import { 
+    Search, Boxes, AlertTriangle, PackagePlus, ArrowRightLeft, 
+    Settings2, History, Edit, Trash2, Sliders, Filter, X, 
+    Layers, PackageCheck 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import PageHeader from '../components/ui/PageHeader';
@@ -17,6 +21,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 import { useStockItems, useReleaseStock, useUpdateStockItem, useDeleteStockItem } from '../features/stock/useStock';
 import { useWarehouses } from '../features/warehouses/useWarehouses';
+import { useCategories } from '../features/products/useProducts';
 import { useAuthStore } from '../store/authStore';
 import { usePermission } from '../hooks/usePermission';
 
@@ -24,6 +29,23 @@ import StockTransferPage from './StockTransferPage';
 import StockAdjustmentPage from './StockAdjustmentPage';
 import OpeningStockPage from './OpeningStockPage';
 import StockMovementsPage from './StockMovementsPage';
+
+const PRODUCT_TYPE_OPTIONS = [
+    { value: '', label: 'All Product Types' },
+    { value: 'finished_good', label: 'Finished Goods (sellable)' },
+    { value: 'raw_material', label: 'Raw Materials' },
+    { value: 'semi_finished', label: 'Semi-Finished' },
+    { value: 'packaging', label: 'Packaging' },
+    { value: 'consumable', label: 'Consumable' },
+    { value: 'service', label: 'Service' },
+];
+
+const STOCK_STATUS_OPTIONS = [
+    { value: '', label: 'All Stock Status' },
+    { value: 'in_stock', label: 'In Stock (> 0)' },
+    { value: 'low_stock', label: 'Low / Critical Stock' },
+    { value: 'out_of_stock', label: 'Out of Stock (0)' },
+];
 
 export default function StockPage({ initialTab = 'balances' }) {
     const navigate = useNavigate();
@@ -53,9 +75,15 @@ export default function StockPage({ initialTab = 'balances' }) {
     const canAdjust = hasPermission('inventory.adjust') || ['super_admin', 'admin', 'manager', 'warehouse_manager', 'warehouse_staff'].includes(user?.role);
 
     const [filters, setFilters] = useState({
-        search: '', warehouseId: '', lowStock: '',
+        search: '',
+        warehouseId: '',
+        productType: '',
+        categoryId: '',
+        stockStatus: '',
         stockType: '', // 'open' or 'balance' or ''
-        page: 1, limit: 20,
+        lowStock: '',
+        page: 1,
+        limit: 20,
     });
 
     const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
@@ -78,6 +106,7 @@ export default function StockPage({ initialTab = 'balances' }) {
 
     const { data, isLoading } = useStockItems(filters);
     const { data: warehousesData } = useWarehouses();
+    const { data: categoriesData } = useCategories();
     const releaseMutation = useReleaseStock();
     const updateMutation = useUpdateStockItem();
     const deleteMutation = useDeleteStockItem();
@@ -129,9 +158,45 @@ export default function StockPage({ initialTab = 'balances' }) {
     const total = data?.total || 0;
     const totalPages = data?.totalPages || 1;
 
-    const warehouseOptions = (warehousesData?.data || []).map((w) => ({
-        value: w._id, label: `${w.name} (${w.warehouseCode})`,
-    }));
+    const warehouseOptions = [
+        { value: '', label: 'All Warehouses' },
+        ...(warehousesData?.data || []).map((w) => ({
+            value: w._id,
+            label: `${w.name} (${w.warehouseCode})`,
+        })),
+    ];
+
+    const categoryOptions = [
+        { value: '', label: 'All Categories' },
+        ...(categoriesData?.data || []).map((c) => ({
+            value: c._id,
+            label: `${c.name} (${c.code})`,
+        })),
+    ];
+
+    const isFiltered = Boolean(
+        filters.search ||
+        filters.warehouseId ||
+        filters.productType ||
+        filters.categoryId ||
+        filters.stockStatus ||
+        filters.stockType ||
+        filters.lowStock
+    );
+
+    const handleResetFilters = () => {
+        setFilters({
+            search: '',
+            warehouseId: '',
+            productType: '',
+            categoryId: '',
+            stockStatus: '',
+            stockType: '',
+            lowStock: '',
+            page: 1,
+            limit: 20,
+        });
+    };
 
     const handleOpenReleaseModal = (item) => {
         setSelectedItemForRelease(item);
@@ -394,10 +459,23 @@ export default function StockPage({ initialTab = 'balances' }) {
                 <>
 
             {/* ─── SUMMARY STRIP ─── */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
                 <Card className="p-4">
                     <p className="text-xs text-gray-500 mb-1">Total Items</p>
                     <p className="text-2xl font-bold text-gray-800">{total}</p>
+                </Card>
+                <Card className={`p-4 transition border ${filters.productType === 'finished_good' ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-400/20' : ''}`}>
+                    <p className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                        <span>Finished Goods</span>
+                        <PackageCheck size={14} className="text-emerald-600" />
+                    </p>
+                    <button
+                        type="button"
+                        className={`text-xl font-bold text-left hover:underline cursor-pointer ${filters.productType === 'finished_good' ? 'text-emerald-700' : 'text-slate-800'}`}
+                        onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'finished_good' ? '' : 'finished_good', page: 1 }))}
+                    >
+                        {filters.productType === 'finished_good' ? `${total} Filtered` : 'Filter Finished'}
+                    </button>
                 </Card>
                 <Card className="p-4">
                     <p className="text-xs text-gray-500 mb-1">Page Value</p>
@@ -405,15 +483,15 @@ export default function StockPage({ initialTab = 'balances' }) {
                 </Card>
                 <Card className="p-4">
                     <p className="text-xs text-gray-500 mb-1">Warehouses</p>
-                    <p className="text-2xl font-bold text-gray-800">{warehouseOptions.length}</p>
+                    <p className="text-2xl font-bold text-gray-800">{warehouseOptions.length - 1}</p>
                 </Card>
-                <Card className="p-4 bg-amber-50 border border-amber-200">
+                <Card className={`p-4 transition border ${filters.stockStatus === 'low_stock' || filters.lowStock === 'true' ? 'bg-amber-100/70 border-amber-300 ring-2 ring-amber-400/20' : 'bg-amber-50 border-amber-200'}`}>
                     <p className="text-xs text-amber-600 flex items-center gap-1 mb-1">
                         <AlertTriangle size={12} /> Low / Critical
                     </p>
                     <button
-                        className="text-2xl font-bold text-amber-700 hover:underline"
-                        onClick={() => setFilters((f) => ({ ...f, lowStock: 'true', page: 1 }))}
+                        className="text-2xl font-bold text-amber-700 hover:underline cursor-pointer"
+                        onClick={() => setFilters((f) => ({ ...f, stockStatus: f.stockStatus === 'low_stock' ? '' : 'low_stock', lowStock: f.lowStock === 'true' ? '' : 'true', page: 1 }))}
                     >
                         {lowStockCount > 0 ? lowStockCount : 'View'}
                     </button>
@@ -422,60 +500,238 @@ export default function StockPage({ initialTab = 'balances' }) {
 
             {/* ─── FILTERS + TABLE ─── */}
             <Card>
-                {/* Filter bar */}
-                <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row flex-wrap gap-3">
-                    <div className="relative flex-1 min-w-0">
-                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search product..."
-                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
-                            value={filters.search}
-                            onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
-                        />
-                    </div>
-                    <div className="w-full sm:w-52">
-                        <Select
-                            placeholder="All Warehouses"
-                            options={warehouseOptions}
-                            value={filters.warehouseId}
-                            onChange={(e) => setFilters((f) => ({ ...f, warehouseId: e.target.value, page: 1 }))}
-                        />
-                    </div>
-                    <div className="w-full sm:w-44">
-                        <Select
-                            placeholder="All Stock Types"
-                            options={[
-                                { value: '', label: 'All Stock Types' },
-                                { value: 'open', label: 'Open Stock only' },
-                                { value: 'balance', label: 'Balance Stock only' }
-                            ]}
-                            value={filters.stockType}
-                            onChange={(e) => setFilters((f) => ({ ...f, stockType: e.target.value, page: 1 }))}
-                        />
-                    </div>
-                    <div className="w-full sm:w-40">
-                        <Select
-                            placeholder="All Items"
-                            options={[{ value: 'true', label: 'Low stock only' }]}
-                            value={filters.lowStock}
-                            onChange={(e) => setFilters((f) => ({ ...f, lowStock: e.target.value, page: 1 }))}
-                        />
+                {/* Quick Filter Bar (Pills) */}
+                <div className="p-3.5 border-b border-gray-200 bg-slate-50/60">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Quick View:</span>
+                        <button
+                            type="button"
+                            onClick={() => setFilters(f => ({ ...f, productType: '', lowStock: '', stockStatus: '', page: 1 }))}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                !filters.productType && !filters.lowStock && !filters.stockStatus
+                                    ? 'bg-slate-900 text-white shadow-xs'
+                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                            }`}
+                        >
+                            <Boxes size={13} />
+                            All Stock
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'finished_good' ? '' : 'finished_good', page: 1 }))}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                filters.productType === 'finished_good'
+                                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/30'
+                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/60'
+                            }`}
+                        >
+                            <PackageCheck size={13} className={filters.productType === 'finished_good' ? 'text-white' : 'text-emerald-600'} />
+                            <span>Finished Goods</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'raw_material' ? '' : 'raw_material', page: 1 }))}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                filters.productType === 'raw_material'
+                                    ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20 ring-2 ring-amber-500/30'
+                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-amber-300 hover:bg-amber-50/60'
+                            }`}
+                        >
+                            <Layers size={13} className={filters.productType === 'raw_material' ? 'text-white' : 'text-amber-600'} />
+                            <span>Raw Materials</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'semi_finished' ? '' : 'semi_finished', page: 1 }))}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                filters.productType === 'semi_finished'
+                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20 ring-2 ring-blue-500/30'
+                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/60'
+                            }`}
+                        >
+                            <Settings2 size={13} className={filters.productType === 'semi_finished' ? 'text-white' : 'text-blue-600'} />
+                            <span>Semi-Finished</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'packaging' ? '' : 'packaging', page: 1 }))}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                filters.productType === 'packaging'
+                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20 ring-2 ring-purple-500/30'
+                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-purple-300 hover:bg-purple-50/60'
+                            }`}
+                        >
+                            <Boxes size={13} className={filters.productType === 'packaging' ? 'text-white' : 'text-purple-600'} />
+                            <span>Packaging</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilters(f => ({ ...f, stockStatus: f.stockStatus === 'low_stock' ? '' : 'low_stock', lowStock: f.lowStock === 'true' ? '' : 'true', page: 1 }))}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                filters.stockStatus === 'low_stock' || filters.lowStock === 'true'
+                                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20 ring-2 ring-rose-500/30'
+                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-rose-300 hover:bg-rose-50/60'
+                            }`}
+                        >
+                            <AlertTriangle size={13} className={filters.stockStatus === 'low_stock' || filters.lowStock === 'true' ? 'text-white' : 'text-rose-600'} />
+                            <span>Low Stock</span>
+                        </button>
                     </div>
                 </div>
 
+                {/* Filter Controls Bar */}
+                <div className="p-4 border-b border-gray-200 flex flex-col gap-3">
+                    {/* Primary filter row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="relative">
+                            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search name, code, SKU, batch..."
+                                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-primary-500"
+                                value={filters.search}
+                                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
+                            />
+                        </div>
+                        <div>
+                            <Select
+                                placeholder="All Warehouses"
+                                options={warehouseOptions}
+                                value={filters.warehouseId}
+                                onChange={(e) => setFilters((f) => ({ ...f, warehouseId: e.target.value, page: 1 }))}
+                            />
+                        </div>
+                        <div>
+                            <Select
+                                placeholder="All Product Types"
+                                options={PRODUCT_TYPE_OPTIONS}
+                                value={filters.productType}
+                                onChange={(e) => setFilters((f) => ({ ...f, productType: e.target.value, page: 1 }))}
+                            />
+                        </div>
+                        <div>
+                            <Select
+                                placeholder="All Categories"
+                                options={categoryOptions}
+                                value={filters.categoryId}
+                                onChange={(e) => setFilters((f) => ({ ...f, categoryId: e.target.value, page: 1 }))}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Secondary filter row */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <div className="flex flex-wrap items-center gap-3 flex-1">
+                            <div className="w-full sm:w-48">
+                                <Select
+                                    placeholder="All Stock Status"
+                                    options={STOCK_STATUS_OPTIONS}
+                                    value={filters.stockStatus}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setFilters((f) => ({
+                                            ...f,
+                                            stockStatus: val,
+                                            lowStock: val === 'low_stock' ? 'true' : '',
+                                            page: 1,
+                                        }));
+                                    }}
+                                />
+                            </div>
+                            <div className="w-full sm:w-48">
+                                <Select
+                                    placeholder="All Stock Types"
+                                    options={[
+                                        { value: '', label: 'All Stock Types' },
+                                        { value: 'open', label: 'Open Stock only' },
+                                        { value: 'balance', label: 'Balance Stock only' },
+                                    ]}
+                                    value={filters.stockType}
+                                    onChange={(e) => setFilters((f) => ({ ...f, stockType: e.target.value, page: 1 }))}
+                                />
+                            </div>
+                        </div>
+
+                        {isFiltered && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleResetFilters}
+                                className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                            >
+                                <X size={14} className="mr-1" /> Reset All Filters
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Active Filter Chips */}
+                    {isFiltered && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-xs text-slate-500">
+                            <span className="font-semibold text-slate-600 mr-1 flex items-center gap-1">
+                                <Filter size={12} /> Active Filters:
+                            </span>
+                            {filters.search && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium">
+                                    Search: "{filters.search}"
+                                    <button type="button" onClick={() => setFilters(f => ({ ...f, search: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
+                                </span>
+                            )}
+                            {filters.productType && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium">
+                                    Type: {PRODUCT_TYPE_OPTIONS.find(o => o.value === filters.productType)?.label || filters.productType}
+                                    <button type="button" onClick={() => setFilters(f => ({ ...f, productType: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
+                                </span>
+                            )}
+                            {filters.warehouseId && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">
+                                    Warehouse: {warehouseOptions.find(o => o.value === filters.warehouseId)?.label || 'Selected'}
+                                    <button type="button" onClick={() => setFilters(f => ({ ...f, warehouseId: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
+                                </span>
+                            )}
+                            {filters.categoryId && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium">
+                                    Category: {categoryOptions.find(o => o.value === filters.categoryId)?.label || 'Selected'}
+                                    <button type="button" onClick={() => setFilters(f => ({ ...f, categoryId: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
+                                </span>
+                            )}
+                            {filters.stockStatus && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
+                                    Status: {STOCK_STATUS_OPTIONS.find(o => o.value === filters.stockStatus)?.label || filters.stockStatus}
+                                    <button type="button" onClick={() => setFilters(f => ({ ...f, stockStatus: '', lowStock: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
+                                </span>
+                            )}
+                            {filters.stockType && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 font-medium">
+                                    Stock: {filters.stockType === 'open' ? 'Open Stock only' : 'Balance Stock only'}
+                                    <button type="button" onClick={() => setFilters(f => ({ ...f, stockType: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {isLoading ? (
-                    <div className="py-16 text-center text-gray-500">Loading...</div>
+                    <div className="py-16 text-center text-gray-500">Loading stock data...</div>
                 ) : items.length === 0 ? (
                     <EmptyState
                         icon={Boxes}
-                        title="No stock data"
-                        description="Enter opening stock to get started"
-                        action={canAdjust && (
-                            <Button variant="primary" onClick={() => navigate('/stock/opening')}>
-                                <PackagePlus size={16} className="mr-1.5" /> Enter Opening Stock
-                            </Button>
-                        )}
+                        title={isFiltered ? "No matching stock items" : "No stock data"}
+                        description={
+                            isFiltered
+                                ? "Try adjusting or clearing your filters to see more inventory items."
+                                : "Enter opening stock to get started"
+                        }
+                        action={
+                            isFiltered ? (
+                                <Button variant="outline" onClick={handleResetFilters}>
+                                    <X size={16} className="mr-1.5" /> Clear All Filters
+                                </Button>
+                            ) : canAdjust && (
+                                <Button variant="primary" onClick={() => navigate('/stock/opening')}>
+                                    <PackagePlus size={16} className="mr-1.5" /> Enter Opening Stock
+                                </Button>
+                            )
+                        }
                     />
                 ) : (
                     <>
@@ -501,8 +757,27 @@ export default function StockPage({ initialTab = 'balances' }) {
                                         return (
                                             <tr key={r._id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-5 py-3">
-                                                    <p className="font-medium text-sm text-gray-800">{r.productName}</p>
-                                                    <p className="text-xs font-mono text-gray-400">{r.productCode}</p>
+                                                    <p className="font-semibold text-sm text-gray-900">{r.productName}</p>
+                                                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                        <span className="text-xs font-mono text-gray-400">{r.productCode}</span>
+                                                        {r.productId?.productType === 'finished_good' && (
+                                                            <Badge variant="success" size="sm">Finished Good</Badge>
+                                                        )}
+                                                        {r.productId?.productType === 'raw_material' && (
+                                                            <Badge variant="warning" size="sm">Raw Material</Badge>
+                                                        )}
+                                                        {r.productId?.productType === 'semi_finished' && (
+                                                            <Badge variant="info" size="sm">Semi-Finished</Badge>
+                                                        )}
+                                                        {r.productId?.productType === 'packaging' && (
+                                                            <Badge variant="default" size="sm">Packaging</Badge>
+                                                        )}
+                                                        {r.productId?.categoryId?.name && (
+                                                            <span className="text-[10px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                                                                {r.productId.categoryId.name}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <p className="text-sm text-gray-700">{r.warehouseId?.name}</p>
@@ -589,7 +864,23 @@ export default function StockPage({ initialTab = 'balances' }) {
                                         <div className="flex items-start justify-between mb-3">
                                             <div className="min-w-0 flex-1">
                                                 <p className="font-semibold text-sm text-gray-800 truncate">{r.productName}</p>
-                                                <p className="text-xs font-mono text-gray-400 mt-0.5">{r.productCode}</p>
+                                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                    <span className="text-xs font-mono text-gray-400">{r.productCode}</span>
+                                                    {r.productId?.productType === 'finished_good' && (
+                                                        <Badge variant="success" size="sm">Finished Good</Badge>
+                                                    )}
+                                                    {r.productId?.productType === 'raw_material' && (
+                                                        <Badge variant="warning" size="sm">Raw Material</Badge>
+                                                    )}
+                                                    {r.productId?.productType === 'semi_finished' && (
+                                                        <Badge variant="info" size="sm">Semi-Finished</Badge>
+                                                    )}
+                                                    {r.productId?.categoryId?.name && (
+                                                        <span className="text-[10px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                                                            {r.productId.categoryId.name}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                             <Badge variant={s.variant} className="ml-2 flex-shrink-0">{s.label}</Badge>
                                         </div>

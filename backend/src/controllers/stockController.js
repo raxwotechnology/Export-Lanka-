@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import StockItem from '../models/StockItem.js';
 import StockMovement from '../models/StockMovement.js';
 import StockReservation from '../models/StockReservation.js';
+import Product from '../models/Product.js';
 import {
     increaseStock, decreaseStock,
 } from '../services/stockService.js';
@@ -17,6 +18,9 @@ export const getStockItems = asyncHandler(async (req, res) => {
         search, productId, warehouseId, lowStock,
         page = 1, limit = 50,
         stockType,
+        productType,
+        categoryId,
+        stockStatus,
     } = req.query;
 
     const filter = {};
@@ -26,6 +30,7 @@ export const getStockItems = asyncHandler(async (req, res) => {
         filter.$or = [
             { productCode: { $regex: search, $options: 'i' } },
             { productName: { $regex: search, $options: 'i' } },
+            { batchNumber: { $regex: search, $options: 'i' } },
         ];
     }
 
@@ -35,17 +40,48 @@ export const getStockItems = asyncHandler(async (req, res) => {
         filter['quantities.balanceStock'] = { $gt: 0 };
     }
 
+    if (stockStatus === 'in_stock') {
+        filter['quantities.onHand'] = { $gt: 0 };
+    } else if (stockStatus === 'out_of_stock') {
+        filter['quantities.onHand'] = { $lte: 0 };
+    }
+
+    // Filter by productType (e.g. 'finished_good') and/or categoryId
+    if (productType || categoryId) {
+        const productFilter = {};
+        if (productType) {
+            productFilter.productType = productType;
+        }
+        if (categoryId) {
+            productFilter.categoryId = categoryId;
+        }
+        const matchingProducts = await Product.find(productFilter).select('_id');
+        const productIds = matchingProducts.map((p) => p._id);
+
+        if (filter.productId) {
+            if (!productIds.some((id) => String(id) === String(filter.productId))) {
+                filter.productId = new mongoose.Types.ObjectId(); // No intersection
+            }
+        } else {
+            filter.productId = { $in: productIds };
+        }
+    }
+
     const skip = (Number(page) - 1) * Number(limit);
 
     let items = await StockItem.find(filter)
-        .populate('productId', 'name productCode sku stockLevels type productType')
+        .populate({
+            path: 'productId',
+            select: 'name productCode sku stockLevels type productType categoryId unitOfMeasure',
+            populate: { path: 'categoryId', select: 'name code' },
+        })
         .populate('warehouseId', 'name warehouseCode')
         .sort({ productName: 1 })
         .skip(skip)
         .limit(Number(limit));
 
     // Filter low-stock in-memory (depends on product's reorderLevel)
-    if (lowStock === 'true') {
+    if (lowStock === 'true' || stockStatus === 'low_stock') {
         items = items.filter((s) => {
             const reorder = s.productId?.stockLevels?.reorderLevel || 0;
             return s.quantities.onHand <= reorder && reorder > 0;

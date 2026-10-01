@@ -13,6 +13,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
+import CategoryAutocompleteSelect from '../components/ui/CategoryAutocompleteSelect';
 import Textarea from '../components/ui/Textarea';
 import Table from '../components/ui/Table';
 import Badge from '../components/ui/Badge';
@@ -345,10 +346,12 @@ function CategoriesTabContent({ canManage }) {
         register,
         handleSubmit,
         reset,
+        setValue,
+        watch,
         formState: { errors },
     } = useForm({
         resolver: zodResolver(categoryFormSchema),
-        defaultValues: { type: 'product', isActive: true },
+        defaultValues: { type: 'product', isActive: true, parentCategory: '' },
     });
 
     const openForm = (category = null) => {
@@ -358,7 +361,7 @@ function CategoriesTabContent({ canManage }) {
                 name: category.name,
                 code: category.code,
                 description: category.description || '',
-                parentCategory: category.parentCategory?._id || '',
+                parentCategory: category.parentCategory?._id || category.parentCategory || '',
                 type: category.type,
                 isActive: category.isActive,
             });
@@ -371,7 +374,7 @@ function CategoriesTabContent({ canManage }) {
     const onSubmit = async (formData) => {
         const payload = {
             ...formData,
-            parentCategory: formData.parentCategory || null,
+            parentCategory: formData.parentCategory?.trim() || null,
             description: formData.description || undefined,
         };
         try {
@@ -485,10 +488,13 @@ function CategoriesTabContent({ canManage }) {
                             ]}
                             {...register('type')}
                         />
-                        <Select
+                        <CategoryAutocompleteSelect
                             label="Parent Category (optional)"
-                            options={parentOptions}
-                            {...register('parentCategory')}
+                            categories={categories}
+                            value={watch('parentCategory')}
+                            onChange={(val) => setValue('parentCategory', val, { shouldValidate: true })}
+                            excludeCategoryId={editing?._id}
+                            error={errors.parentCategory?.message}
                         />
                         <Textarea label="Description" rows={2} error={errors.description?.message} {...register('description')} />
                         <div className="flex items-center gap-2">
