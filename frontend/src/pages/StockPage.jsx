@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
     Search, Boxes, AlertTriangle, PackagePlus, ArrowRightLeft, 
     Settings2, History, Edit, Trash2, Sliders, Filter, X, 
-    Layers, PackageCheck 
+    Layers, PackageCheck, Building2, Tag, ChevronDown, RotateCcw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -500,132 +500,185 @@ export default function StockPage({ initialTab = 'balances' }) {
 
             {/* ─── FILTERS + TABLE ─── */}
             <Card>
-                {/* Quick Filter Bar (Pills) */}
-                <div className="p-3.5 border-b border-gray-200 bg-slate-50/60">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Quick View:</span>
-                        <button
-                            type="button"
-                            onClick={() => setFilters(f => ({ ...f, productType: '', lowStock: '', stockStatus: '', page: 1 }))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                                !filters.productType && !filters.lowStock && !filters.stockStatus
-                                    ? 'bg-slate-900 text-white shadow-xs'
-                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                            }`}
-                        >
-                            <Boxes size={13} />
-                            All Stock
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'finished_good' ? '' : 'finished_good', page: 1 }))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                                filters.productType === 'finished_good'
-                                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/30'
-                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/60'
-                            }`}
-                        >
-                            <PackageCheck size={13} className={filters.productType === 'finished_good' ? 'text-white' : 'text-emerald-600'} />
-                            <span>Finished Goods</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'raw_material' ? '' : 'raw_material', page: 1 }))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                                filters.productType === 'raw_material'
-                                    ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20 ring-2 ring-amber-500/30'
-                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-amber-300 hover:bg-amber-50/60'
-                            }`}
-                        >
-                            <Layers size={13} className={filters.productType === 'raw_material' ? 'text-white' : 'text-amber-600'} />
-                            <span>Raw Materials</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'semi_finished' ? '' : 'semi_finished', page: 1 }))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                                filters.productType === 'semi_finished'
-                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20 ring-2 ring-blue-500/30'
-                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50/60'
-                            }`}
-                        >
-                            <Settings2 size={13} className={filters.productType === 'semi_finished' ? 'text-white' : 'text-blue-600'} />
-                            <span>Semi-Finished</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'packaging' ? '' : 'packaging', page: 1 }))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                                filters.productType === 'packaging'
-                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20 ring-2 ring-purple-500/30'
-                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-purple-300 hover:bg-purple-50/60'
-                            }`}
-                        >
-                            <Boxes size={13} className={filters.productType === 'packaging' ? 'text-white' : 'text-purple-600'} />
-                            <span>Packaging</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setFilters(f => ({ ...f, stockStatus: f.stockStatus === 'low_stock' ? '' : 'low_stock', lowStock: f.lowStock === 'true' ? '' : 'true', page: 1 }))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                                filters.stockStatus === 'low_stock' || filters.lowStock === 'true'
-                                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20 ring-2 ring-rose-500/30'
-                                    : 'bg-white border border-slate-200 text-slate-700 hover:border-rose-300 hover:bg-rose-50/60'
-                            }`}
-                        >
-                            <AlertTriangle size={13} className={filters.stockStatus === 'low_stock' || filters.lowStock === 'true' ? 'text-white' : 'text-rose-600'} />
-                            <span>Low Stock</span>
-                        </button>
-                    </div>
-                </div>
+                {/* ─── PROFESSIONAL FILTER TOOLBAR ─── */}
+                <div className="p-4 sm:p-5 border-b border-slate-200/90 bg-gradient-to-b from-slate-50/70 to-white">
+                    {/* Header: Filter title & Quick View Tabs */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200/80">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-emerald-100/80 text-emerald-700 flex items-center justify-center shadow-xs">
+                                <Filter size={15} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">Filter Inventory</h4>
+                                    {isFiltered && (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                            Filters Active
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-[11px] text-slate-400 font-medium">Search & refine stock records across all facilities</p>
+                            </div>
+                        </div>
 
-                {/* Filter Controls Bar */}
-                <div className="p-4 border-b border-gray-200 flex flex-col gap-3">
-                    {/* Primary filter row */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div className="relative">
-                            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search name, code, SKU, batch..."
-                                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-primary-500"
-                                value={filters.search}
-                                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
-                            />
-                        </div>
-                        <div>
-                            <Select
-                                placeholder="All Warehouses"
-                                options={warehouseOptions}
-                                value={filters.warehouseId}
-                                onChange={(e) => setFilters((f) => ({ ...f, warehouseId: e.target.value, page: 1 }))}
-                            />
-                        </div>
-                        <div>
-                            <Select
-                                placeholder="All Product Types"
-                                options={PRODUCT_TYPE_OPTIONS}
-                                value={filters.productType}
-                                onChange={(e) => setFilters((f) => ({ ...f, productType: e.target.value, page: 1 }))}
-                            />
-                        </div>
-                        <div>
-                            <Select
-                                placeholder="All Categories"
-                                options={categoryOptions}
-                                value={filters.categoryId}
-                                onChange={(e) => setFilters((f) => ({ ...f, categoryId: e.target.value, page: 1 }))}
-                            />
+                        {/* Quick View Pills */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1 hidden sm:inline">Quick View:</span>
+                            <button
+                                type="button"
+                                onClick={() => setFilters(f => ({ ...f, productType: '', lowStock: '', stockStatus: '', page: 1 }))}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                    !filters.productType && !filters.lowStock && !filters.stockStatus
+                                        ? 'bg-slate-900 text-white shadow-xs'
+                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                }`}
+                            >
+                                <Boxes size={13} />
+                                All Stock
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'finished_good' ? '' : 'finished_good', page: 1 }))}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                    filters.productType === 'finished_good'
+                                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/30'
+                                        : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/60'
+                                }`}
+                            >
+                                <PackageCheck size={13} className={filters.productType === 'finished_good' ? 'text-white' : 'text-emerald-600'} />
+                                <span>Finished Goods</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFilters(f => ({ ...f, productType: f.productType === 'raw_material' ? '' : 'raw_material', page: 1 }))}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                    filters.productType === 'raw_material'
+                                        ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20 ring-2 ring-amber-500/30'
+                                        : 'bg-white border border-slate-200 text-slate-700 hover:border-amber-300 hover:bg-amber-50/60'
+                                }`}
+                            >
+                                <Layers size={13} className={filters.productType === 'raw_material' ? 'text-white' : 'text-amber-600'} />
+                                <span>Raw Materials</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFilters(f => ({ ...f, stockStatus: f.stockStatus === 'low_stock' ? '' : 'low_stock', lowStock: f.lowStock === 'true' ? '' : 'true', page: 1 }))}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                    filters.stockStatus === 'low_stock' || filters.lowStock === 'true'
+                                        ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20 ring-2 ring-rose-500/30'
+                                        : 'bg-white border border-slate-200 text-slate-700 hover:border-rose-300 hover:bg-rose-50/60'
+                                }`}
+                            >
+                                <AlertTriangle size={13} className={filters.stockStatus === 'low_stock' || filters.lowStock === 'true' ? 'text-white' : 'text-rose-600'} />
+                                <span>Low Stock</span>
+                            </button>
                         </div>
                     </div>
 
-                    {/* Secondary filter row */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                        <div className="flex flex-wrap items-center gap-3 flex-1">
-                            <div className="w-full sm:w-48">
-                                <Select
-                                    placeholder="All Stock Status"
-                                    options={STOCK_STATUS_OPTIONS}
+                    {/* Symmetrical 3x2 Grid for Controls */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        {/* 1. Search Box */}
+                        <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+                                <Search size={12} className="text-emerald-600" />
+                                Search Product / Batch
+                            </label>
+                            <div className="relative">
+                                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by name, SKU, code, batch..."
+                                    value={filters.search}
+                                    onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
+                                    className="w-full h-10 pl-9.5 pr-8 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 hover:border-slate-400 transition"
+                                />
+                                {filters.search && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilters((f) => ({ ...f, search: '', page: 1 }))}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition"
+                                        title="Clear search"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 2. Warehouse */}
+                        <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+                                <Building2 size={12} className="text-emerald-600" />
+                                Warehouse Facility
+                            </label>
+                            <div className="relative">
+                                <select
+                                    value={filters.warehouseId}
+                                    onChange={(e) => setFilters((f) => ({ ...f, warehouseId: e.target.value, page: 1 }))}
+                                    className="w-full h-10 pl-3.5 pr-8 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 hover:border-slate-400 transition appearance-none cursor-pointer"
+                                >
+                                    {warehouseOptions.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
+                        </div>
+
+                        {/* 3. Product Type */}
+                        <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+                                <PackageCheck size={12} className="text-emerald-600" />
+                                Product Type
+                            </label>
+                            <div className="relative">
+                                <select
+                                    value={filters.productType}
+                                    onChange={(e) => setFilters((f) => ({ ...f, productType: e.target.value, page: 1 }))}
+                                    className="w-full h-10 pl-3.5 pr-8 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 hover:border-slate-400 transition appearance-none cursor-pointer"
+                                >
+                                    {PRODUCT_TYPE_OPTIONS.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
+                        </div>
+
+                        {/* 4. Category */}
+                        <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+                                <Tag size={12} className="text-emerald-600" />
+                                Category
+                            </label>
+                            <div className="relative">
+                                <select
+                                    value={filters.categoryId}
+                                    onChange={(e) => setFilters((f) => ({ ...f, categoryId: e.target.value, page: 1 }))}
+                                    className="w-full h-10 pl-3.5 pr-8 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 hover:border-slate-400 transition appearance-none cursor-pointer"
+                                >
+                                    {categoryOptions.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
+                        </div>
+
+                        {/* 5. Stock Status */}
+                        <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+                                <AlertTriangle size={12} className="text-emerald-600" />
+                                Stock Availability
+                            </label>
+                            <div className="relative">
+                                <select
                                     value={filters.stockStatus}
                                     onChange={(e) => {
                                         const val = e.target.value;
@@ -636,76 +689,91 @@ export default function StockPage({ initialTab = 'balances' }) {
                                             page: 1,
                                         }));
                                     }}
-                                />
-                            </div>
-                            <div className="w-full sm:w-48">
-                                <Select
-                                    placeholder="All Stock Types"
-                                    options={[
-                                        { value: '', label: 'All Stock Types' },
-                                        { value: 'open', label: 'Open Stock only' },
-                                        { value: 'balance', label: 'Balance Stock only' },
-                                    ]}
-                                    value={filters.stockType}
-                                    onChange={(e) => setFilters((f) => ({ ...f, stockType: e.target.value, page: 1 }))}
-                                />
+                                    className="w-full h-10 pl-3.5 pr-8 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 hover:border-slate-400 transition appearance-none cursor-pointer"
+                                >
+                                    {STOCK_STATUS_OPTIONS.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                             </div>
                         </div>
 
-                        {isFiltered && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleResetFilters}
-                                className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
-                            >
-                                <X size={14} className="mr-1" /> Reset All Filters
-                            </Button>
-                        )}
+                        {/* 6. Stock Bucket / Type */}
+                        <div>
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+                                <Layers size={12} className="text-emerald-600" />
+                                Stock Bucket
+                            </label>
+                            <div className="relative">
+                                <select
+                                    value={filters.stockType}
+                                    onChange={(e) => setFilters((f) => ({ ...f, stockType: e.target.value, page: 1 }))}
+                                    className="w-full h-10 pl-3.5 pr-8 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 hover:border-slate-400 transition appearance-none cursor-pointer"
+                                >
+                                    <option value="">All Stock Types</option>
+                                    <option value="open">Open Stock (POS Available)</option>
+                                    <option value="balance">Balance Stock (Unreleased)</option>
+                                </select>
+                                <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Active Filter Chips */}
+                    {/* Active Filter Chips Bar */}
                     {isFiltered && (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-xs text-slate-500">
-                            <span className="font-semibold text-slate-600 mr-1 flex items-center gap-1">
-                                <Filter size={12} /> Active Filters:
-                            </span>
-                            {filters.search && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium">
-                                    Search: "{filters.search}"
-                                    <button type="button" onClick={() => setFilters(f => ({ ...f, search: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200/80 mt-3 text-xs">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="font-bold text-slate-500 flex items-center gap-1">
+                                    Active Filters:
                                 </span>
-                            )}
-                            {filters.productType && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium">
-                                    Type: {PRODUCT_TYPE_OPTIONS.find(o => o.value === filters.productType)?.label || filters.productType}
-                                    <button type="button" onClick={() => setFilters(f => ({ ...f, productType: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
-                                </span>
-                            )}
-                            {filters.warehouseId && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">
-                                    Warehouse: {warehouseOptions.find(o => o.value === filters.warehouseId)?.label || 'Selected'}
-                                    <button type="button" onClick={() => setFilters(f => ({ ...f, warehouseId: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
-                                </span>
-                            )}
-                            {filters.categoryId && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium">
-                                    Category: {categoryOptions.find(o => o.value === filters.categoryId)?.label || 'Selected'}
-                                    <button type="button" onClick={() => setFilters(f => ({ ...f, categoryId: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
-                                </span>
-                            )}
-                            {filters.stockStatus && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
-                                    Status: {STOCK_STATUS_OPTIONS.find(o => o.value === filters.stockStatus)?.label || filters.stockStatus}
-                                    <button type="button" onClick={() => setFilters(f => ({ ...f, stockStatus: '', lowStock: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
-                                </span>
-                            )}
-                            {filters.stockType && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 font-medium">
-                                    Stock: {filters.stockType === 'open' ? 'Open Stock only' : 'Balance Stock only'}
-                                    <button type="button" onClick={() => setFilters(f => ({ ...f, stockType: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer font-bold ml-0.5">×</button>
-                                </span>
-                            )}
+                                {filters.search && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">
+                                        Search: "{filters.search}"
+                                        <button type="button" onClick={() => setFilters(f => ({ ...f, search: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer ml-0.5">×</button>
+                                    </span>
+                                )}
+                                {filters.warehouseId && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 font-semibold border border-blue-200">
+                                        Warehouse: {warehouseOptions.find(o => o.value === filters.warehouseId)?.label || 'Selected'}
+                                        <button type="button" onClick={() => setFilters(f => ({ ...f, warehouseId: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer ml-0.5">×</button>
+                                    </span>
+                                )}
+                                {filters.productType && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200">
+                                        Type: {PRODUCT_TYPE_OPTIONS.find(o => o.value === filters.productType)?.label || filters.productType}
+                                        <button type="button" onClick={() => setFilters(f => ({ ...f, productType: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer ml-0.5">×</button>
+                                    </span>
+                                )}
+                                {filters.categoryId && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-800 font-semibold border border-purple-200">
+                                        Category: {categoryOptions.find(o => o.value === filters.categoryId)?.label || 'Selected'}
+                                        <button type="button" onClick={() => setFilters(f => ({ ...f, categoryId: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer ml-0.5">×</button>
+                                    </span>
+                                )}
+                                {filters.stockStatus && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 font-semibold border border-amber-200">
+                                        Status: {STOCK_STATUS_OPTIONS.find(o => o.value === filters.stockStatus)?.label || filters.stockStatus}
+                                        <button type="button" onClick={() => setFilters(f => ({ ...f, stockStatus: '', lowStock: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer ml-0.5">×</button>
+                                    </span>
+                                )}
+                                {filters.stockType && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-800 font-semibold border border-teal-200">
+                                        Stock: {filters.stockType === 'open' ? 'Open Stock only' : 'Balance Stock only'}
+                                        <button type="button" onClick={() => setFilters(f => ({ ...f, stockType: '', page: 1 }))} className="hover:text-rose-600 cursor-pointer ml-0.5">×</button>
+                                    </span>
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleResetFilters}
+                                className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1 rounded-lg transition flex items-center gap-1.5 cursor-pointer ml-auto"
+                            >
+                                <RotateCcw size={12} /> Clear All Filters
+                            </button>
                         </div>
                     )}
                 </div>

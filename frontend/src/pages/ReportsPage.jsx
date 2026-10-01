@@ -20,6 +20,7 @@ const reportGroups = [
             { title: 'Sales Summary', description: 'Overall sales metrics for a period', path: '/reports/sales', icon: TrendingUp },
             { title: 'Sales by Product', description: 'Top and bottom performing products', path: '/reports/sales-by-product', icon: Package },
             { title: 'Sales by Customer', description: 'Customer revenue and outstanding balances', path: '/reports/sales-by-customer', icon: Users },
+            { title: 'AI Predictions & Forecasting', description: 'Regression sales trajectories, depletion dates & burn rates', path: '/reports/predictions', icon: TrendingUp },
         ],
     },
     {

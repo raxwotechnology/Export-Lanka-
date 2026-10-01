@@ -11,6 +11,9 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import KpiCard from '../../components/ui/KpiCard';
 import { useVarianceReport, useSalesComparison, useFinancialTargets, useSetTarget } from '../../features/reports/useReports';
+import { useSettings } from '../../features/settings/useSettings';
+import ReportExportButtons from '../../components/ui/ReportExportButtons';
+import { exportToExcel, exportToPDF } from '../../utils/dataExport';
 import toast from 'react-hot-toast';
 
 const monthsList = [
@@ -111,15 +114,116 @@ export default function VarianceComparisonPage() {
         }
     };
 
+    const { data: settingsData } = useSettings();
+    const settings = settingsData?.data;
+
+    const handleExportExcel = () => {
+        if (activeTab === 'variance') {
+            if (!varianceData) return;
+            const rows = [
+                { 'Performance Metric': 'Monthly Target Budget', 'Amount (LKR)': varianceData.target?.revenueTarget || 0 },
+                { 'Performance Metric': 'Actual Invoiced Revenue MTD', 'Amount (LKR)': varianceData.actual?.revenue || 0 },
+                { 'Performance Metric': 'Target Variance Amount', 'Amount (LKR)': varianceData.variance?.revenue || 0 },
+                { 'Performance Metric': 'Variance Percentage', 'Amount (LKR)': `${varianceData.variance?.revenuePercent || 0}%` },
+                { 'Performance Metric': 'Milestone Status', 'Amount (LKR)': varianceData.variance?.status || 'N/A' },
+                { 'Performance Metric': 'Month Timeline Progress %', 'Amount (LKR)': `${varianceData.timeline?.monthProgressPercent || 0}%` },
+                { 'Performance Metric': 'Projected Full Month Run-rate', 'Amount (LKR)': varianceData.projections?.projectedRevenue || 0 },
+                { 'Performance Metric': 'Required Daily Target', 'Amount (LKR)': varianceData.timeline?.requiredDailyRevenue || 0 },
+                { 'Performance Metric': 'Actual Daily Average Revenue', 'Amount (LKR)': varianceData.timeline?.actualDailyRevenue || 0 },
+            ];
+            exportToExcel(rows, `Target_vs_Actual_Variance_${varYear}_${varMonth}`, 'Variance Report');
+        } else {
+            if (!comparisonData) return;
+            const m = comparisonData.metrics || {};
+            const labelA = comparisonData.periodA?.label || `Period A`;
+            const labelB = comparisonData.periodB?.label || `Period B`;
+            const rows = [
+                { 'Business Metric': 'Invoiced Revenue (LKR)', [labelA]: m.revenue?.a || 0, [labelB]: m.revenue?.b || 0, 'Growth Rate %': `${m.revenue?.growthPercent || 0}%` },
+                { 'Business Metric': 'Gross Profit Margin (LKR)', [labelA]: m.grossProfit?.a || 0, [labelB]: m.grossProfit?.b || 0, 'Growth Rate %': `${m.grossProfit?.growthPercent || 0}%` },
+                { 'Business Metric': 'Operating Expenses (LKR)', [labelA]: m.expenses?.a || 0, [labelB]: m.expenses?.b || 0, 'Growth Rate %': `${m.expenses?.growthPercent || 0}%` },
+                { 'Business Metric': 'Orders Completed Count', [labelA]: m.ordersCount?.a || 0, [labelB]: m.ordersCount?.b || 0, 'Growth Rate %': `${m.ordersCount?.growthPercent || 0}%` },
+            ];
+            exportToExcel(rows, `Performance_Comparison_${yearA}_M${monthA}_vs_${yearB}_M${monthB}`, 'Comparison Report');
+        }
+    };
+
+    const handleExportPDF = () => {
+        if (activeTab === 'variance') {
+            if (!varianceData) return;
+            const rows = [
+                { metric: 'Monthly Revenue Target Budget', val: fmtLKR(varianceData.target?.revenueTarget) },
+                { metric: 'Actual Revenue Realized MTD', val: fmtLKR(varianceData.actual?.revenue) },
+                { metric: 'Target Variance (Difference)', val: fmtLKR(varianceData.variance?.revenue) },
+                { metric: 'Variance Percentage', val: `${varianceData.variance?.revenuePercent || 0}%` },
+                { metric: 'Milestone Tracking Status', val: varianceData.variance?.status || 'N/A' },
+                { metric: 'Month Timeline Progress', val: `${varianceData.timeline?.monthProgressPercent || 0}%` },
+                { metric: 'Projected Full Month Run-rate', val: fmtLKR(varianceData.projections?.projectedRevenue) },
+                { metric: 'Required Daily Revenue Run-rate', val: fmtLKR(varianceData.timeline?.requiredDailyRevenue) },
+                { metric: 'Actual Daily Average Revenue', val: fmtLKR(varianceData.timeline?.actualDailyRevenue) },
+            ];
+            const columns = [
+                { header: 'Variance Tracking Metric', dataKey: 'metric' },
+                { header: 'Value / Status', dataKey: 'val', halign: 'right' },
+            ];
+            const summaryCards = [
+                { label: 'Target Budget', value: fmtLKR(varianceData.target?.revenueTarget) },
+                { label: 'Actual Revenue', value: fmtLKR(varianceData.actual?.revenue) },
+                { label: 'Variance', value: fmtLKR(varianceData.variance?.revenue) },
+                { label: 'Status', value: varianceData.variance?.status || 'N/A' },
+            ];
+            exportToPDF('Target vs Actual Variance Report', columns, rows, `Target_vs_Actual_Variance_${varYear}_${varMonth}`, {
+                period: `${monthsList.find(m => m.value === Number(varMonth))?.label} ${varYear}`,
+                companyName: settings?.companyName,
+                companyTagline: settings?.companyTagline,
+                companyAddress: settings?.companyAddress,
+                companyPhone: settings?.companyPhone,
+                companyEmail: settings?.companyEmail,
+                summaryCards
+            });
+        } else {
+            if (!comparisonData) return;
+            const m = comparisonData.metrics || {};
+            const labelA = comparisonData.periodA?.label || `Period A`;
+            const labelB = comparisonData.periodB?.label || `Period B`;
+            const rows = [
+                { metric: 'Invoiced Revenue', a: fmtLKR(m.revenue?.a), b: fmtLKR(m.revenue?.b), growth: `${m.revenue?.growthPercent || 0}%` },
+                { metric: 'Gross Profit Margin', a: fmtLKR(m.grossProfit?.a), b: fmtLKR(m.grossProfit?.b), growth: `${m.grossProfit?.growthPercent || 0}%` },
+                { metric: 'Operating Expenses', a: fmtLKR(m.expenses?.a), b: fmtLKR(m.expenses?.b), growth: `${m.expenses?.growthPercent || 0}%` },
+                { metric: 'Orders Fulfilled', a: String(m.ordersCount?.a || 0), b: String(m.ordersCount?.b || 0), growth: `${m.ordersCount?.growthPercent || 0}%` },
+            ];
+            const columns = [
+                { header: 'Business KPI Metric', dataKey: 'metric' },
+                { header: labelA, dataKey: 'a', halign: 'right' },
+                { header: labelB, dataKey: 'b', halign: 'right' },
+                { header: 'Growth Rate', dataKey: 'growth', halign: 'right' },
+            ];
+            exportToPDF('Financial Period Comparison Report', columns, rows, `Performance_Comparison_${yearA}_M${monthA}_vs_${yearB}_M${monthB}`, {
+                period: `${labelA} vs ${labelB}`,
+                companyName: settings?.companyName,
+                companyTagline: settings?.companyTagline,
+                companyAddress: settings?.companyAddress,
+                companyPhone: settings?.companyPhone,
+                companyEmail: settings?.companyEmail,
+            });
+        }
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader
                 title="Variance & Sales Comparator"
                 description="Live financial targets tracker and dual-month performance comparator"
                 actions={
-                    <Button variant="outline" onClick={() => navigate('/reports')}>
-                        <ArrowLeft size={16} className="mr-1.5" /> Back
-                    </Button>
+                    <ReportExportButtons
+                        onExportExcel={handleExportExcel}
+                        onExportPDF={handleExportPDF}
+                        onRefresh={() => {
+                            if (activeTab === 'variance') refetchVariance();
+                            else refetchComparison();
+                        }}
+                        disabled={activeTab === 'variance' ? !varianceData : !comparisonData}
+                        loading={isLoadingVariance || isLoadingComparison}
+                    />
                 }
             />
 

@@ -220,8 +220,9 @@ export const deletePurchaseOrder = asyncHandler(async (req, res) => {
  */
 export const getPurchaseOrderPDF = asyncHandler(async (req, res) => {
     const po = await PurchaseOrder.findById(req.params.id)
-        .populate('supplierId', 'displayName companyName primaryContact billingAddress')
-        .populate('items.productId', 'name productCode');
+        .populate('supplierId', 'displayName companyName primaryContact billingAddress supplierCode taxRegistrationNumber businessRegistrationNumber phone email')
+        .populate('items.productId', 'name productCode description unitOfMeasure')
+        .populate('deliverTo.warehouseId', 'name code address');
 
     if (!po) {
         res.status(404);

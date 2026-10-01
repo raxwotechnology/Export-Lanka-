@@ -11,6 +11,9 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Badge from '../../components/ui/Badge';
 import { useShiftWiseReport } from '../../features/reports/useReports';
+import { useSettings } from '../../features/settings/useSettings';
+import ReportExportButtons from '../../components/ui/ReportExportButtons';
+import { exportToExcel, exportToPDF } from '../../utils/dataExport';
 
 export default function ShiftReportingPage() {
     const navigate = useNavigate();
@@ -170,15 +173,86 @@ export default function ShiftReportingPage() {
         );
     };
 
+    const { data: settingsData } = useSettings();
+    const settings = settingsData?.data;
+
+    const handleExportExcel = () => {
+        if (!reportData) return;
+        const rows = [];
+        const shiftsToExport = shiftFilter ? [shiftFilter] : ['day', 'night'];
+
+        shiftsToExport.forEach(shiftKey => {
+            const s = shiftKey === 'day' ? reportData.dayShift : reportData.nightShift;
+            if (!s) return;
+            const shiftTitle = `${shiftKey.toUpperCase()} SHIFT`;
+            rows.push(
+                { 'Shift': shiftTitle, 'Operational Category': 'Production', 'Metric / KPI': 'Input Weight', 'Value': `${(s.production?.inputKg || 0).toLocaleString()} kg` },
+                { 'Shift': shiftTitle, 'Operational Category': 'Production', 'Metric / KPI': 'Output Weight', 'Value': `${(s.production?.outputKg || 0).toLocaleString()} kg` },
+                { 'Shift': shiftTitle, 'Operational Category': 'Production', 'Metric / KPI': 'Yield Efficiency', 'Value': `${s.production?.efficiency || 0}%` },
+                { 'Shift': shiftTitle, 'Operational Category': 'Production', 'Metric / KPI': 'Firewood Consumed', 'Value': `${(s.production?.woodKg || 0).toLocaleString()} kg` },
+                { 'Shift': shiftTitle, 'Operational Category': 'HR & Attendance', 'Metric / KPI': 'Staff Present Count', 'Value': `${s.hr?.presentCount || 0} employees` },
+                { 'Shift': shiftTitle, 'Operational Category': 'HR & Attendance', 'Metric / KPI': 'Overtime Hours Logged', 'Value': `${s.hr?.overtimeHours || 0} hrs` },
+                { 'Shift': shiftTitle, 'Operational Category': 'HR & Attendance', 'Metric / KPI': 'Estimated Wages & EPF/ETF', 'Value': fmtLKR(s.hr?.estimatedWages || 0) },
+                { 'Shift': shiftTitle, 'Operational Category': 'Logistics & Fleet', 'Metric / KPI': 'Delivery Trips Count', 'Value': `${s.logistics?.tripsCount || 0} trips` },
+                { 'Shift': shiftTitle, 'Operational Category': 'Logistics & Fleet', 'Metric / KPI': 'Distance Driven', 'Value': `${s.logistics?.distanceKm || 0} km` },
+                { 'Shift': shiftTitle, 'Operational Category': 'Logistics & Fleet', 'Metric / KPI': 'Fuel & Trip Costs', 'Value': fmtLKR(s.logistics?.cost || 0) }
+            );
+        });
+
+        exportToExcel(rows, `Shift_Operations_Log_${startDate}_to_${endDate}`, 'Shift Operations');
+    };
+
+    const handleExportPDF = () => {
+        if (!reportData) return;
+        const rows = [];
+        const shiftsToExport = shiftFilter ? [shiftFilter] : ['day', 'night'];
+
+        shiftsToExport.forEach(shiftKey => {
+            const s = shiftKey === 'day' ? reportData.dayShift : reportData.nightShift;
+            if (!s) return;
+            const shiftTitle = `${shiftKey.toUpperCase()}`;
+            rows.push(
+                { shift: shiftTitle, cat: 'Production', metric: 'Input Weight', val: `${(s.production?.inputKg || 0).toLocaleString()} kg` },
+                { shift: shiftTitle, cat: 'Production', metric: 'Output Yield', val: `${(s.production?.outputKg || 0).toLocaleString()} kg` },
+                { shift: shiftTitle, cat: 'Production', metric: 'Efficiency %', val: `${s.production?.efficiency || 0}%` },
+                { shift: shiftTitle, cat: 'Production', metric: 'Firewood Consumed', val: `${(s.production?.woodKg || 0).toLocaleString()} kg` },
+                { shift: shiftTitle, cat: 'Human Resources', metric: 'Present Staff', val: `${s.hr?.presentCount || 0} staff` },
+                { shift: shiftTitle, cat: 'Human Resources', metric: 'Overtime Hours', val: `${s.hr?.overtimeHours || 0} hrs` },
+                { shift: shiftTitle, cat: 'Human Resources', metric: 'Wages & EPF/ETF Cost', val: fmtLKR(s.hr?.estimatedWages || 0) },
+                { shift: shiftTitle, cat: 'Logistics Fleet', metric: 'Trips & Distance', val: `${s.logistics?.tripsCount || 0} trips (${s.logistics?.distanceKm || 0} km)` },
+                { shift: shiftTitle, cat: 'Logistics Fleet', metric: 'Trip Running Cost', val: fmtLKR(s.logistics?.cost || 0) }
+            );
+        });
+
+        const columns = [
+            { header: 'Work Shift', dataKey: 'shift', halign: 'center' },
+            { header: 'Operations Category', dataKey: 'cat' },
+            { header: 'Metric / KPI Description', dataKey: 'metric' },
+            { header: 'Recorded Value', dataKey: 'val', halign: 'right' },
+        ];
+
+        exportToPDF('Shift-Wise Operations Performance Report', columns, rows, `Shift_Operations_Log_${startDate}_to_${endDate}`, {
+            period: `${startDate} to ${endDate} (${shiftFilter ? shiftFilter.toUpperCase() : 'ALL SHIFTS'})`,
+            companyName: settings?.companyName,
+            companyTagline: settings?.companyTagline,
+            companyAddress: settings?.companyAddress,
+            companyPhone: settings?.companyPhone,
+            companyEmail: settings?.companyEmail,
+        });
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader
                 title="Shift-Wise Operations Report"
                 description="Aggregated logs of Production, Wages, and Fleet logs isolated by Shift"
                 actions={
-                    <Button variant="outline" onClick={() => navigate('/reports')}>
-                        <ArrowLeft size={16} className="mr-1.5" /> Back
-                    </Button>
+                    <ReportExportButtons
+                        onExportExcel={handleExportExcel}
+                        onExportPDF={handleExportPDF}
+                        disabled={!reportData}
+                        loading={isLoading}
+                    />
                 }
             />
 

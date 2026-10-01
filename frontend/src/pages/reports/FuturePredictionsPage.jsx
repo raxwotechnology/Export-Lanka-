@@ -33,6 +33,9 @@ import KpiCard from '../../components/ui/KpiCard';
 import Badge from '../../components/ui/Badge';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
+import { useSettings } from '../../features/settings/useSettings';
+import ReportExportButtons from '../../components/ui/ReportExportButtons';
+import { exportToExcel, exportToPDF } from '../../utils/dataExport';
 
 export default function FuturePredictionsPage() {
     const [activeTab, setActiveTab] = useState('sales');
@@ -278,6 +281,68 @@ export default function FuturePredictionsPage() {
 
     const { salesProjections, expenseProjections } = predictionData;
 
+    const { data: settingsData } = useSettings();
+    const settings = settingsData?.data;
+
+    const handleExportExcel = () => {
+        if (!predictionData) return;
+        const stockRows = (predictionData.stockDepletion || []).map(item => ({
+            'Section': 'Stock Depletion Projections',
+            'Item Code': item.productCode,
+            'Item Name': item.productName,
+            'Current On Hand': item.currentStock,
+            'Daily Outflow Velocity': item.dailyRunRate,
+            'Estimated Runout Days': item.estimatedRunoutDays === Infinity ? 'Safe (>90d)' : `${item.estimatedRunoutDays} days`,
+            'Stockout Date': item.stockoutDate || 'No depletion risk',
+            'Risk Severity': item.riskLevel.toUpperCase()
+        }));
+
+        const salesRows = (predictionData.salesForecast || []).map(f => ({
+            'Section': 'Weekly Sales Forecast',
+            'Item Code': '—',
+            'Item Name': f.week,
+            'Current On Hand': '—',
+            'Daily Outflow Velocity': '—',
+            'Estimated Runout Days': '—',
+            'Stockout Date': '—',
+            'Risk Severity': fmtCurrency(f.projectedSales)
+        }));
+
+        exportToExcel([...stockRows, ...salesRows], `AI_Predictions_Forecasting_${new Date().toISOString().slice(0, 10)}`, 'AI Forecast');
+    };
+
+    const handleExportPDF = () => {
+        if (!predictionData) return;
+        const stockList = predictionData.stockDepletion || [];
+        const columns = [
+            { header: 'Code', dataKey: 'productCode' },
+            { header: 'Product Name', dataKey: 'productName' },
+            { header: 'On Hand', dataKey: 'currentStock', isNumeric: true },
+            { header: 'Daily Velocity', dataKey: 'dailyRunRate', isNumeric: true },
+            { header: 'Days to Depletion', dataKey: (r) => r.estimatedRunoutDays === Infinity ? 'Safe' : `${r.estimatedRunoutDays}d`, halign: 'center' },
+            { header: 'Est. Stockout Date', dataKey: (r) => r.stockoutDate || 'Healthy' },
+            { header: 'Risk Status', dataKey: (r) => r.riskLevel?.toUpperCase() },
+        ];
+
+        const summaryCards = [
+            { label: '30-Day Sales Proj.', value: fmtCurrency(salesProjections.next4Weeks) },
+            { label: 'Stockout Risk Items', value: `${stockRiskCounts.critical + stockRiskCounts.warning} SKUs` },
+            { label: '30-Day Burn Rate', value: fmtCurrency(expenseProjections.projected30DayBurn) },
+            { label: 'Sales Growth Rate', value: `${salesProjections.weeklyGrowthRate >= 0 ? '+' : ''}${salesProjections.weeklyGrowthRate}%/wk` },
+        ];
+
+        exportToPDF('Future Predictions & Inventory Depletion Audit', columns, stockList, `AI_Predictions_Forecasting_${new Date().toISOString().slice(0, 10)}`, {
+            period: `Forecast Horizon: Next 30 - 90 Days`,
+            companyName: settings?.companyName,
+            companyTagline: settings?.companyTagline,
+            companyAddress: settings?.companyAddress,
+            companyPhone: settings?.companyPhone,
+            companyEmail: settings?.companyEmail,
+            summaryCards,
+            orientation: 'landscape'
+        });
+    };
+
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
             {/* Header */}
@@ -285,8 +350,15 @@ export default function FuturePredictionsPage() {
                 <PageHeader
                     title="Future Predictions & AI Forecasting Center"
                     description="Harness historical metrics to predict sales trajectories, operational burn rates, and inventory depletion dates."
+                    actions={
+                        <ReportExportButtons
+                            onExportExcel={handleExportExcel}
+                            onExportPDF={handleExportPDF}
+                            disabled={!predictionData}
+                        />
+                    }
                 />
-                <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2 flex items-center gap-2 self-start md:self-auto">
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2 flex items-center gap-2 self-start md:self-auto shrink-0">
                     <Sparkles className="text-indigo-600 animate-pulse w-5 h-5" />
                     <div>
                         <span className="text-xs text-indigo-700 font-bold uppercase tracking-wider block">AI Processing</span>

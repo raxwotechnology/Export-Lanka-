@@ -17,6 +17,9 @@ import Select from '../../components/ui/Select';
 import Input from '../../components/ui/Input';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
+import { useSettings } from '../../features/settings/useSettings';
+import ReportExportButtons from '../../components/ui/ReportExportButtons';
+import { exportToExcel, exportToPDF } from '../../utils/dataExport';
 
 export default function YieldForecasterPage() {
     const [products, setProducts] = useState([]);
@@ -137,11 +140,77 @@ export default function YieldForecasterPage() {
 
     const chartData = getChartData();
 
+    const { data: settingsData } = useSettings();
+    const settings = settingsData?.data;
+    const selectedProductObj = products.find(p => p._id === selectedProductId);
+
+    const handleExportExcel = () => {
+        if (!projections || !forecastingData) return;
+        const historyRows = (forecastingData.history || []).map(h => ({
+            'Section': 'Historical Batch Records',
+            'Parameter / Batch Ref': h.batchNumber || 'Batch',
+            'Input Weight (kg)': h.inputWeight,
+            'Output Weight (kg)': h.outputWeight,
+            'Yield Efficiency': `${h.efficiency}%`,
+            'Firewood (kg)': h.firewoodUsed || 0,
+            'Electricity (kWh)': h.electricityUsed || 0
+        }));
+
+        const projRows = [
+            { 'Section': 'Simulated Projection', 'Parameter / Batch Ref': 'Simulated Input Weight', 'Input Weight (kg)': proposedInput, 'Output Weight (kg)': '—', 'Yield Efficiency': '—', 'Firewood (kg)': '—', 'Electricity (kWh)': '—' },
+            { 'Section': 'Simulated Projection', 'Parameter / Batch Ref': 'Projected Output Yield', 'Input Weight (kg)': '—', 'Output Weight (kg)': projections.trendOutput, 'Yield Efficiency': `${projections.trendEfficiency}%`, 'Firewood (kg)': '—', 'Electricity (kWh)': '—' },
+            { 'Section': 'Simulated Projection', 'Parameter / Batch Ref': 'Projected Scrap / Wastage', 'Input Weight (kg)': '—', 'Output Weight (kg)': projections.trendWastage, 'Yield Efficiency': '—', 'Firewood (kg)': '—', 'Electricity (kWh)': '—' },
+            { 'Section': 'Simulated Projection', 'Parameter / Batch Ref': 'Estimated Firewood Required', 'Input Weight (kg)': '—', 'Output Weight (kg)': '—', 'Yield Efficiency': '—', 'Firewood (kg)': projections.firewood, 'Electricity (kWh)': '—' },
+            { 'Section': 'Simulated Projection', 'Parameter / Batch Ref': 'Estimated Electricity Required', 'Input Weight (kg)': '—', 'Output Weight (kg)': '—', 'Yield Efficiency': '—', 'Firewood (kg)': '—', 'Electricity (kWh)': projections.electricity }
+        ];
+
+        exportToExcel([...projRows, ...historyRows], `Yield_Forecast_${selectedProductObj?.productCode || 'Product'}_${new Date().toISOString().slice(0, 10)}`, 'Yield Forecast');
+    };
+
+    const handleExportPDF = () => {
+        if (!projections || !forecastingData) return;
+        const rows = [
+            { item: 'Proposed Raw Material Input', val: `${proposedInput} kg` },
+            { item: 'Projected Output Yield (Regression)', val: `${projections.trendOutput} kg (${projections.trendEfficiency}%)` },
+            { item: 'Projected Output Yield (Moving Average)', val: `${projections.movingAvgOutput} kg (${projections.movingAvgEfficiency}%)` },
+            { item: 'Expected Scrap / Production Wastage', val: `${projections.trendWastage} kg` },
+            { item: 'Firewood Consumption Estimate', val: `${projections.firewood} kg` },
+            { item: 'Electricity Energy Consumption Estimate', val: `${projections.electricity} kWh` },
+        ];
+        const columns = [
+            { header: 'Yield & Utility Forecasting Parameter', dataKey: 'item' },
+            { header: 'Projected Value', dataKey: 'val', halign: 'right' },
+        ];
+        const summaryCards = [
+            { label: 'Proposed Input', value: `${proposedInput} kg` },
+            { label: 'Expected Yield', value: `${projections.trendOutput} kg` },
+            { label: 'Expected Wastage', value: `${projections.trendWastage} kg` },
+            { label: 'Yield Ratio', value: `${projections.trendEfficiency}%` },
+        ];
+        exportToPDF(`Yield & Resource Forecasting Report`, columns, rows, `Yield_Forecast_${selectedProductObj?.productCode || 'Product'}`, {
+            period: `Analyzed Item: ${selectedProductObj?.name || 'Selected Item'} (${selectedProductObj?.productCode || ''})`,
+            companyName: settings?.companyName,
+            companyTagline: settings?.companyTagline,
+            companyAddress: settings?.companyAddress,
+            companyPhone: settings?.companyPhone,
+            companyEmail: settings?.companyEmail,
+            summaryCards
+        });
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader
                 title="Yield & Resource Forecaster"
                 description="Predict manufacturing output, wastage, and resource consumption based on historical batch data"
+                actions={
+                    <ReportExportButtons
+                        onExportExcel={handleExportExcel}
+                        onExportPDF={handleExportPDF}
+                        disabled={!projections || !forecastingData}
+                        loading={isLoading}
+                    />
+                }
             />
 
             <Card className="p-6">

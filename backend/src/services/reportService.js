@@ -24,6 +24,86 @@ const formatDate = (date) => {
 };
 
 /**
+ * Normalizes system settings merged with default corporate branding
+ */
+const resolveCompanySettings = (settings) => {
+    const s = settings && typeof settings.toObject === 'function' ? settings.toObject() : (settings || {});
+    return {
+        name: s.companyName || COMPANY_BRANDING.name || 'Authentic Lanka Exports (Pvt) Ltd',
+        tagline: s.companyTagline || COMPANY_BRANDING.tagline || 'Premium Organic & Agricultural Exporters',
+        address: s.companyAddress || COMPANY_BRANDING.address || 'No. 45/2, Temple Road, Colombo 03, Sri Lanka',
+        phone: s.companyPhone || COMPANY_BRANDING.phone || '+94 11 234 5678 / +94 77 123 4567',
+        email: s.companyEmail || COMPANY_BRANDING.email || 'info@authenticlanka.com',
+        website: s.companyWebsite || COMPANY_BRANDING.website || 'www.authenticlanka.com',
+        vatNumber: s.taxId || COMPANY_BRANDING.vatNumber || 'VAT 114567890-7000',
+        businessRegNumber: s.businessRegNo || COMPANY_BRANDING.businessRegNumber || 'PV 00234567',
+        logo: s.companyLogo || COMPANY_BRANDING.logoUrl || null,
+        bankDetails: s.bankDetails || COMPANY_BRANDING.bankDetails || {},
+        currency: s.currency || 'LKR',
+        currencySymbol: s.currencySymbol || 'Rs.'
+    };
+};
+
+/**
+ * Safely renders the corporate logo from settings (Base64 data URL, file path, or default fallback)
+ */
+const renderCompanyLogo = (doc, brand, x = 30, y = 18, width = 52, height = 52) => {
+    let drawn = false;
+
+    // 1. Try brand.logo if provided (base64 data URL, disk path, or public folder)
+    if (brand && brand.logo && typeof brand.logo === 'string') {
+        try {
+            if (brand.logo.startsWith('data:image')) {
+                const base64Data = brand.logo.replace(/^data:image\/\w+;base64,/, '');
+                const buffer = Buffer.from(base64Data, 'base64');
+                doc.image(buffer, x, y, { width, height, fit: [width, height] });
+                drawn = true;
+            } else if (fs.existsSync(brand.logo)) {
+                doc.image(brand.logo, x, y, { width, height, fit: [width, height] });
+                drawn = true;
+            } else {
+                const pubPath = path.join(__dirname, '../../../frontend/public', brand.logo.replace(/^\//, ''));
+                if (fs.existsSync(pubPath)) {
+                    doc.image(pubPath, x, y, { width, height, fit: [width, height] });
+                    drawn = true;
+                }
+            }
+        } catch (e) {
+            console.warn('[PDF] Failed to draw custom logo:', e.message);
+        }
+    }
+
+    // 2. Fallback to LOGO_PATH
+    if (!drawn && fs.existsSync(LOGO_PATH)) {
+        try {
+            doc.image(LOGO_PATH, x, y, { width, height, fit: [width, height] });
+            drawn = true;
+        } catch (e) {
+            console.warn('[PDF] Failed to draw fallback LOGO_PATH:', e.message);
+        }
+    }
+
+    // 3. Fallback to COMPANY_BRANDING.logoBase64
+    if (!drawn && COMPANY_BRANDING.logoBase64) {
+        try {
+            const buffer = Buffer.from(COMPANY_BRANDING.logoBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+            doc.image(buffer, x, y, { width, height, fit: [width, height] });
+            drawn = true;
+        } catch (e) {
+            console.warn('[PDF] Failed to draw base64 branding logo:', e.message);
+        }
+    }
+
+    // 4. Fallback monogram badge if no image could be rendered
+    if (!drawn) {
+        doc.roundedRect(x, y, width, height, 6).fillAndStroke('#065F46', '#047857');
+        doc.font('Helvetica-Bold').fontSize(14).fillColor('#FFFFFF').text('ALE', x, y + 16, { width, align: 'center' });
+    }
+
+    return drawn;
+};
+
+/**
  * ReportService
  * Handles professional generation of Excel and PDF documents with Authentic Lanka Exports corporate branding.
  */
@@ -77,7 +157,7 @@ class ReportService {
      * Generate PDF Report (Tabular Summary Reports)
      */
     async generatePDF({ title, columns, data, user, settings }) {
-        const brand = { ...COMPANY_BRANDING, ...(settings || {}) };
+        const brand = resolveCompanySettings(settings);
         const isLandscape = columns.length > 7;
 
         return new Promise((resolve, reject) => {
@@ -98,20 +178,14 @@ class ReportService {
             doc.rect(0, 0, pageWidth, 5).fill('#065F46'); // Deep Emerald
 
             // 2. Header with Logo & Corporate Info
-            if (fs.existsSync(LOGO_PATH)) {
-                try {
-                    doc.image(LOGO_PATH, 30, 18, { width: 48, height: 48 });
-                } catch (e) {
-                    console.warn('[PDF] Failed to draw logo:', e.message);
-                }
-            }
+            renderCompanyLogo(doc, brand, 30, 18, 48, 48);
 
-            const headerLeft = fs.existsSync(LOGO_PATH) ? 88 : 30;
+            const headerLeft = 88;
             doc.font('Helvetica-Bold').fontSize(13).fillColor('#065F46').text(brand.name.toUpperCase(), headerLeft, 18);
-            doc.font('Helvetica-Oblique').fontSize(8).fillColor('#047857').text(brand.tagline || COMPANY_BRANDING.tagline, headerLeft, 33);
+            doc.font('Helvetica-Oblique').fontSize(8).fillColor('#047857').text(brand.tagline, headerLeft, 33);
             doc.font('Helvetica').fontSize(7.5).fillColor('#475569')
-                .text(`${brand.address || COMPANY_BRANDING.address}  ·  Tel: ${brand.phone || COMPANY_BRANDING.phone}`, headerLeft, 44)
-                .text(`Email: ${brand.email || COMPANY_BRANDING.email}  ·  Web: ${brand.website || COMPANY_BRANDING.website}  ·  ${brand.vatNumber || COMPANY_BRANDING.vatNumber}`, headerLeft, 55);
+                .text(`${brand.address}  ·  Tel: ${brand.phone}`, headerLeft, 44)
+                .text(`Email: ${brand.email}  ·  Web: ${brand.website}  ·  ${brand.vatNumber}  ·  BR: ${brand.businessRegNumber}`, headerLeft, 55);
 
             // Report Title & Meta on Right Side
             const rightWidth = isLandscape ? 300 : 220;
@@ -153,17 +227,19 @@ class ReportService {
                 }
             };
 
+            doc.x = 30;
             doc.y = 80;
 
             const finish = () => {
                 const range = doc.bufferedPageRange();
                 for (let i = range.start; i < range.start + range.count; i++) {
                     doc.switchToPage(i);
+                    doc.page.margins.bottom = 0;
                     doc.fontSize(7.5).fillColor('#94A3B8').text(
-                        `Authentic Lanka Exports (Pvt) Ltd  ·  Confidential & Proprietary  ·  Page ${i + 1} of ${range.count}`,
+                        `${brand.name}  ·  Confidential & Proprietary  ·  Page ${i + 1} of ${range.count}`,
                         0,
                         doc.page.height - 20,
-                        { align: 'center', width: doc.page.width }
+                        { align: 'center', width: doc.page.width, lineBreak: false }
                     );
                 }
                 doc.end();
@@ -171,6 +247,7 @@ class ReportService {
 
             try {
                 const result = doc.table(table, {
+                    x: 30,
                     prepareHeader: () => doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#065F46'),
                     prepareRow: () => doc.font('Helvetica').fontSize(8).fillColor('#1E293B'),
                 });
@@ -190,7 +267,7 @@ class ReportService {
      * Generate Official Invoice PDF
      */
     async generateInvoicePDF(invoice, settings) {
-        const brand = { ...COMPANY_BRANDING, ...(settings || {}) };
+        const brand = resolveCompanySettings(settings);
         const currency = invoice.currency || 'LKR';
 
         return new Promise((resolve, reject) => {
@@ -206,21 +283,15 @@ class ReportService {
             doc.rect(0, 0, pageWidth, 6).fill('#065F46');
 
             // 2. Company Logo & Corporate Header
-            if (fs.existsSync(LOGO_PATH)) {
-                try {
-                    doc.image(LOGO_PATH, 30, 20, { width: 55, height: 55 });
-                } catch (e) {
-                    console.warn('[PDF] Failed to draw invoice logo:', e.message);
-                }
-            }
+            renderCompanyLogo(doc, brand, 30, 18, 52, 52);
 
-            const headerLeft = fs.existsSync(LOGO_PATH) ? 95 : 30;
-            doc.font('Helvetica-Bold').fontSize(14).fillColor('#065F46').text(brand.name.toUpperCase(), headerLeft, 20);
-            doc.font('Helvetica-Oblique').fontSize(8.5).fillColor('#047857').text(brand.tagline || COMPANY_BRANDING.tagline, headerLeft, 36);
+            const headerLeft = 90;
+            doc.font('Helvetica-Bold').fontSize(14).fillColor('#065F46').text(brand.name.toUpperCase(), headerLeft, 18);
+            doc.font('Helvetica-Oblique').fontSize(8.5).fillColor('#047857').text(brand.tagline, headerLeft, 34);
             doc.font('Helvetica').fontSize(7.5).fillColor('#475569')
-                .text(brand.address || COMPANY_BRANDING.address, headerLeft, 48)
-                .text(`Tel: ${brand.phone || COMPANY_BRANDING.phone}  ·  Email: ${brand.email || COMPANY_BRANDING.email}`, headerLeft, 58)
-                .text(`Web: ${brand.website || COMPANY_BRANDING.website}  ·  ${brand.vatNumber || COMPANY_BRANDING.vatNumber}  ·  BR: ${brand.businessRegNumber || COMPANY_BRANDING.businessRegNumber}`, headerLeft, 68);
+                .text(brand.address, headerLeft, 46)
+                .text(`Tel: ${brand.phone}  ·  Email: ${brand.email}`, headerLeft, 57)
+                .text(`Web: ${brand.website}  ·  ${brand.vatNumber}  ·  BR: ${brand.businessRegNumber}`, headerLeft, 67);
 
             // Right side: Document Title & Identifiers
             const docTitle = invoice.invoiceType === 'proforma' ? 'PROFORMA INVOICE' : 'TAX INVOICE';
@@ -318,6 +389,7 @@ class ReportService {
                 }
             };
 
+            doc.x = 30;
             doc.y = tableStartY;
 
             const drawInvoiceFooterAndFinish = () => {
@@ -399,11 +471,12 @@ class ReportService {
                 const range = doc.bufferedPageRange();
                 for (let i = range.start; i < range.start + range.count; i++) {
                     doc.switchToPage(i);
+                    doc.page.margins.bottom = 0;
                     doc.fontSize(7).fillColor('#94A3B8').text(
-                        `Authentic Lanka Exports (Pvt) Ltd  ·  Tax Registration: ${brand.vatNumber || COMPANY_BRANDING.vatNumber}  ·  Page ${i + 1} of ${range.count}`,
+                        `${brand.name}  ·  Tax Registration: ${brand.vatNumber || '—'}  ·  Page ${i + 1} of ${range.count}`,
                         0,
                         doc.page.height - 18,
-                        { align: 'center', width: doc.page.width }
+                        { align: 'center', width: doc.page.width, lineBreak: false }
                     );
                 }
 
@@ -412,6 +485,8 @@ class ReportService {
 
             try {
                 const result = doc.table(table, {
+                    x: 30,
+                    width: 535,
                     prepareHeader: () => doc.font('Helvetica-Bold').fontSize(8).fillColor('#065F46'),
                     prepareRow: () => doc.font('Helvetica').fontSize(7.5).fillColor('#1E293B'),
                 });
@@ -431,7 +506,7 @@ class ReportService {
      * Generate Official Quotation PDF
      */
     async generateQuotationPDF(quote, settings) {
-        const brand = { ...COMPANY_BRANDING, ...(settings || {}) };
+        const brand = resolveCompanySettings(settings);
         const currency = quote.currency || 'LKR';
 
         return new Promise((resolve, reject) => {
@@ -447,21 +522,15 @@ class ReportService {
             doc.rect(0, 0, pageWidth, 6).fill('#065F46');
 
             // 2. Company Logo & Corporate Header
-            if (fs.existsSync(LOGO_PATH)) {
-                try {
-                    doc.image(LOGO_PATH, 30, 20, { width: 55, height: 55 });
-                } catch (e) {
-                    console.warn('[PDF] Failed to draw quotation logo:', e.message);
-                }
-            }
+            renderCompanyLogo(doc, brand, 30, 18, 52, 52);
 
-            const headerLeft = fs.existsSync(LOGO_PATH) ? 95 : 30;
-            doc.font('Helvetica-Bold').fontSize(14).fillColor('#065F46').text(brand.name.toUpperCase(), headerLeft, 20);
-            doc.font('Helvetica-Oblique').fontSize(8.5).fillColor('#047857').text(brand.tagline || COMPANY_BRANDING.tagline, headerLeft, 36);
+            const headerLeft = 90;
+            doc.font('Helvetica-Bold').fontSize(14).fillColor('#065F46').text(brand.name.toUpperCase(), headerLeft, 18);
+            doc.font('Helvetica-Oblique').fontSize(8.5).fillColor('#047857').text(brand.tagline, headerLeft, 34);
             doc.font('Helvetica').fontSize(7.5).fillColor('#475569')
-                .text(brand.address || COMPANY_BRANDING.address, headerLeft, 48)
-                .text(`Tel: ${brand.phone || COMPANY_BRANDING.phone}  ·  Email: ${brand.email || COMPANY_BRANDING.email}`, headerLeft, 58)
-                .text(`Web: ${brand.website || COMPANY_BRANDING.website}  ·  ${brand.vatNumber || COMPANY_BRANDING.vatNumber}  ·  BR: ${brand.businessRegNumber || COMPANY_BRANDING.businessRegNumber}`, headerLeft, 68);
+                .text(brand.address, headerLeft, 46)
+                .text(`Tel: ${brand.phone}  ·  Email: ${brand.email}`, headerLeft, 57)
+                .text(`Web: ${brand.website}  ·  ${brand.vatNumber}  ·  BR: ${brand.businessRegNumber}`, headerLeft, 67);
 
             // Right side: Document Title & Identifiers
             doc.font('Helvetica-Bold').fontSize(20).fillColor('#1E293B').text('QUOTATION', 350, 20, { align: 'right', width: 215 });
@@ -524,6 +593,7 @@ class ReportService {
                 }
             };
 
+            doc.x = 30;
             doc.y = tableStartY;
 
             const drawQuotationFooterAndFinish = () => {
@@ -586,11 +656,12 @@ class ReportService {
                 const range = doc.bufferedPageRange();
                 for (let i = range.start; i < range.start + range.count; i++) {
                     doc.switchToPage(i);
+                    doc.page.margins.bottom = 0;
                     doc.fontSize(7).fillColor('#94A3B8').text(
-                        `Authentic Lanka Exports (Pvt) Ltd  ·  Quotation ${quote.quoteNumber}  ·  Page ${i + 1} of ${range.count}`,
+                        `${brand.name}  ·  Quotation ${quote.quoteNumber || '—'}  ·  Page ${i + 1} of ${range.count}`,
                         0,
                         doc.page.height - 18,
-                        { align: 'center', width: doc.page.width }
+                        { align: 'center', width: doc.page.width, lineBreak: false }
                     );
                 }
 
@@ -599,6 +670,8 @@ class ReportService {
 
             try {
                 const result = doc.table(table, {
+                    x: 30,
+                    width: 535,
                     prepareHeader: () => doc.font('Helvetica-Bold').fontSize(8).fillColor('#065F46'),
                     prepareRow: () => doc.font('Helvetica').fontSize(7.5).fillColor('#1E293B'),
                 });
@@ -618,8 +691,9 @@ class ReportService {
      * Generate Official Purchase Order PDF
      */
     async generatePurchaseOrderPDF(po, settings) {
-        const brand = { ...COMPANY_BRANDING, ...(settings || {}) };
-        const currency = po.currency || 'LKR';
+        const brand = resolveCompanySettings(settings);
+        const currency = po.currency || brand.currency || 'LKR';
+        const currencySymbol = brand.currencySymbol || (currency === 'USD' ? '$' : 'Rs.');
 
         return new Promise((resolve, reject) => {
             const doc = new PdfPrinter({ margin: 30, size: 'A4' });
@@ -630,87 +704,146 @@ class ReportService {
 
             const pageWidth = doc.page.width;
 
-            // Top Bar
+            // 1. Top Decorative Brand Bar
             doc.rect(0, 0, pageWidth, 6).fill('#065F46');
 
-            // Logo & Header
-            if (fs.existsSync(LOGO_PATH)) {
-                try {
-                    doc.image(LOGO_PATH, 30, 20, { width: 55, height: 55 });
-                } catch (e) {
-                    console.warn('[PDF] Failed to draw PO logo:', e.message);
-                }
-            }
+            // 2. Company Logo & Corporate Header
+            renderCompanyLogo(doc, brand, 30, 18, 52, 52);
 
-            const headerLeft = fs.existsSync(LOGO_PATH) ? 95 : 30;
-            doc.font('Helvetica-Bold').fontSize(14).fillColor('#065F46').text(brand.name.toUpperCase(), headerLeft, 20);
-            doc.font('Helvetica-Oblique').fontSize(8.5).fillColor('#047857').text('Procurement & Factory Operations', headerLeft, 36);
+            const headerLeft = 90;
+            doc.font('Helvetica-Bold').fontSize(13.5).fillColor('#065F46').text(brand.name.toUpperCase(), headerLeft, 18);
+            doc.font('Helvetica-Oblique').fontSize(8).fillColor('#047857').text(brand.tagline, headerLeft, 33);
             doc.font('Helvetica').fontSize(7.5).fillColor('#475569')
-                .text(brand.address || COMPANY_BRANDING.address, headerLeft, 48)
-                .text(`Tel: ${brand.phone || COMPANY_BRANDING.phone}  ·  Email: ${brand.email || COMPANY_BRANDING.email}`, headerLeft, 58)
-                .text(`Web: ${brand.website || COMPANY_BRANDING.website}  ·  ${brand.vatNumber || COMPANY_BRANDING.vatNumber}`, headerLeft, 68);
+                .text(brand.address, headerLeft, 44)
+                .text(`Tel: ${brand.phone}  ·  Email: ${brand.email}`, headerLeft, 55)
+                .text(`Web: ${brand.website}  ·  ${brand.vatNumber}  ·  BR: ${brand.businessRegNumber}`, headerLeft, 66);
 
-            // Right side: Document Title
-            doc.font('Helvetica-Bold').fontSize(20).fillColor('#1E293B').text('PURCHASE ORDER', 350, 20, { align: 'right', width: 215 });
-            doc.font('Helvetica-Bold').fontSize(11).fillColor('#065F46').text(po.poNumber, 350, 44, { align: 'right', width: 215 });
-            doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#334155').text(`STATUS: ${(po.status || 'draft').toUpperCase()}`, 350, 58, { align: 'right', width: 215 });
+            // Right side: Document Title & Identifiers
+            const docTitle = 'PURCHASE ORDER';
+            doc.font('Helvetica-Bold').fontSize(20).fillColor('#0F172A').text(docTitle, 350, 18, { align: 'right', width: 215 });
+            doc.font('Helvetica-Bold').fontSize(11).fillColor('#065F46').text(po.poNumber || 'PO-DRAFT', 350, 42, { align: 'right', width: 215 });
+
+            // Status Pill Badge
+            const statusKey = (po.status || 'draft').toLowerCase();
+            const statusLabel = statusKey.replace('_', ' ').toUpperCase();
+            let statusBg = '#64748B'; // slate
+            if (['approved', 'fully_received', 'received', 'closed'].includes(statusKey)) {
+                statusBg = '#065F46'; // emerald
+            } else if (['partially_received', 'sent'].includes(statusKey)) {
+                statusBg = '#0284C7'; // sky
+            } else if (['pending_approval'].includes(statusKey)) {
+                statusBg = '#D97706'; // amber
+            } else if (['cancelled'].includes(statusKey)) {
+                statusBg = '#DC2626'; // red
+            }
+            
+            const badgeW = 95;
+            const badgeH = 15;
+            const badgeX = pageWidth - 30 - badgeW;
+            const badgeY = 57;
+            doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 3).fill(statusBg);
+            doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFFFFF').text(statusLabel, badgeX, badgeY + 3.5, { align: 'center', width: badgeW });
 
             // Divider Line
-            doc.strokeColor('#CBD5E1').lineWidth(1).moveTo(30, 86).lineTo(pageWidth - 30, 86).stroke();
+            doc.strokeColor('#E2E8F0').lineWidth(1).moveTo(30, 80).lineTo(pageWidth - 30, 80).stroke();
 
-            // Supplier & Delivery Info
+            // 3. Two Columns: Supplier Details (Left) and PO Specifications (Right)
             const supplier = po.supplierId || {};
-            const supplierName = supplier.displayName || supplier.companyName || po.supplierName || 'Primary Supplier';
+            const snapshot = po.supplierSnapshot || {};
+            const supplierName = snapshot.name || supplier.displayName || supplier.companyName || po.supplierName || 'Primary Supplier';
+            const supplierCode = snapshot.code || supplier.supplierCode || '';
+            const supplierTax = snapshot.taxRegistrationNumber || supplier.taxRegistrationNumber || '';
+            const contactPerson = snapshot.contactName || supplier.primaryContact?.name || '';
+            const supplierPhone = snapshot.phone || supplier.primaryContact?.phone || supplier.phone || '';
+            const supplierEmail = supplier.primaryContact?.email || supplier.email || '';
 
-            // Left: Supplier
-            doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#065F46').text('SUPPLIER / VENDOR:', 30, 96);
-            doc.font('Helvetica-Bold').fontSize(10).fillColor('#0F172A').text(supplierName, 30, 108);
-            doc.font('Helvetica').fontSize(8).fillColor('#475569');
-            let cy = 120;
-            if (supplier.address?.line1) { doc.text(`${supplier.address.line1}, ${supplier.address.city || ''}`, 30, cy); cy += 11; }
-            if (supplier.phone) { doc.text(`Tel: ${supplier.phone}`, 30, cy); cy += 11; }
-            if (supplier.email) { doc.text(`Email: ${supplier.email}`, 30, cy); cy += 11; }
+            const billingAddr = po.supplierBillingAddress || supplier.billingAddress || {};
+            const supplierAddress = [
+                billingAddr.line1,
+                billingAddr.line2,
+                billingAddr.city,
+                billingAddr.country || 'Sri Lanka'
+            ].filter(Boolean).join(', ');
 
-            // Right: PO Details
-            const metaX = 350;
-            doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#065F46').text('PO SPECIFICATIONS:', metaX, 96, { align: 'right', width: 215 });
-            doc.font('Helvetica').fontSize(8).fillColor('#475569');
-            doc.text(`Order Date: ${formatDate(po.createdAt || po.orderDate || new Date())}`, metaX, 108, { align: 'right', width: 215 });
-            doc.text(`Expected Delivery: ${formatDate(po.expectedDeliveryDate)}`, metaX, 120, { align: 'right', width: 215 });
-            doc.text(`Ship To: Authentic Lanka Central Facility`, metaX, 132, { align: 'right', width: 215 });
-            doc.text(`Currency: ${currency}`, metaX, 144, { align: 'right', width: 215 });
+            // Left Block: Supplier Card
+            const colWidth = 260;
+            doc.rect(30, 88, colWidth, 18).fill('#F1F5F9');
+            doc.font('Helvetica-Bold').fontSize(8).fillColor('#065F46').text('VENDOR / SUPPLIER DETAILS', 38, 93);
 
-            // Table
-            const tableStartY = Math.max(cy + 10, 165);
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#0F172A').text(supplierName, 30, 112);
+            doc.font('Helvetica').fontSize(7.5).fillColor('#475569');
+            let cy = 125;
+            if (supplierCode) { doc.text(`Vendor Code: ${supplierCode}`, 30, cy); cy += 10.5; }
+            if (supplierTax) { doc.text(`VAT / Tax Reg: ${supplierTax}`, 30, cy); cy += 10.5; }
+            if (contactPerson) { doc.text(`Contact Person: ${contactPerson}`, 30, cy); cy += 10.5; }
+            if (supplierPhone) { doc.text(`Tel / Mobile: ${supplierPhone}`, 30, cy); cy += 10.5; }
+            if (supplierEmail) { doc.text(`Email: ${supplierEmail}`, 30, cy); cy += 10.5; }
+            if (supplierAddress) { doc.text(supplierAddress, 30, cy, { width: colWidth }); cy += 12; }
+
+            // Right Block: PO Specifications
+            const rightX = 305;
+            doc.rect(rightX, 88, colWidth, 18).fill('#F1F5F9');
+            doc.font('Helvetica-Bold').fontSize(8).fillColor('#065F46').text('PO SPECIFICATIONS & DELIVERY', rightX + 8, 93);
+
+            let ry = 112;
+            const drawMetaRow = (label, val) => {
+                doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#475569').text(label, rightX, ry);
+                doc.font('Helvetica').fontSize(7.5).fillColor('#0F172A').text(val || '—', rightX + 85, ry, { width: colWidth - 85 });
+                ry += 11;
+            };
+
+            drawMetaRow('PO Date:', formatDate(po.createdAt || po.orderDate || new Date()));
+            drawMetaRow('Delivery Due:', formatDate(po.expectedDeliveryDate));
+
+            const whName = po.deliverTo?.warehouseName || po.deliverTo?.warehouseId?.name || 'Central Facility';
+            drawMetaRow('Ship To Location:', whName);
+
+            const pTerms = po.paymentTerms?.type ? (po.paymentTerms.type === 'credit' ? `${po.paymentTerms.creditDays || 30} Days Credit` : po.paymentTerms.type.toUpperCase()) : 'Cash on Delivery';
+            drawMetaRow('Payment Terms:', pTerms);
+            drawMetaRow('Order Currency:', `${currency} (${currencySymbol})`);
+
+            // 4. Line Items Table
+            const tableStartY = Math.max(cy, ry) + 10;
             const items = po.items || [];
-            const rows = items.map((it, idx) => ({
-                num: String(idx + 1),
-                desc: it.productName || (it.productId && it.productId.name) || 'Raw Material / Commodity',
-                qty: `${it.orderedQuantity || it.quantity || 0} ${it.uom || 'Kg'}`,
-                unitPrice: fmtCurrency(it.unitPrice, currency),
-                total: fmtCurrency((it.orderedQuantity || it.quantity || 0) * (it.unitPrice || 0), currency)
-            }));
+            const rows = items.map((it, idx) => {
+                const pName = it.productName || (it.productId && it.productId.name) || 'Raw Material / Supply Item';
+                const pCode = it.productCode || (it.productId && it.productId.productCode) || '';
+                const desc = pCode ? `${pName} (${pCode})` : pName;
+                const qtyNum = Number(it.orderedQuantity ?? it.quantity ?? 0);
+                const uom = it.unitOfMeasure || it.uom || 'Kg';
+                const rate = Number(it.unitPrice || 0);
+                const lineTotal = Number(it.lineTotal ?? (qtyNum * rate));
+
+                return {
+                    num: String(idx + 1),
+                    desc: desc,
+                    qty: `${qtyNum.toLocaleString('en-LK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${uom}`,
+                    unitPrice: fmtCurrency(rate, currency),
+                    total: fmtCurrency(lineTotal, currency)
+                };
+            });
 
             const table = {
                 title: '',
                 headers: [
-                    { label: '#', property: 'num', width: 25 },
-                    { label: 'Item & Material Description', property: 'desc', width: 275 },
-                    { label: 'Ordered Qty', property: 'qty', width: 75 },
-                    { label: 'Unit Rate', property: 'unitPrice', width: 80 },
-                    { label: 'Line Total', property: 'total', width: 100 }
+                    { label: '#', property: 'num', width: 25, align: 'center', headerAlign: 'center' },
+                    { label: 'Item & Material Description', property: 'desc', width: 230, align: 'left', headerAlign: 'left' },
+                    { label: 'Ordered Qty', property: 'qty', width: 85, align: 'right', headerAlign: 'right' },
+                    { label: 'Unit Rate', property: 'unitPrice', width: 95, align: 'right', headerAlign: 'right' },
+                    { label: 'Line Total', property: 'total', width: 100, align: 'right', headerAlign: 'right' }
                 ],
                 datas: rows,
                 options: {
                     padding: 5,
-                    columnSpacing: 4,
+                    columnSpacing: 3,
                     divider: {
-                        header: { disabled: false, width: 1.5, opacity: 0.9 },
-                        horizontal: { disabled: false, width: 0.5, opacity: 0.2 }
+                        header: { disabled: false, width: 1.5, opacity: 0.9, color: '#065F46' },
+                        horizontal: { disabled: false, width: 0.5, opacity: 0.25, color: '#CBD5E1' }
                     }
                 }
             };
 
+            doc.x = 30;
             doc.y = tableStartY;
 
             const drawPoFooterAndFinish = () => {
@@ -721,42 +854,63 @@ class ReportService {
                 }
 
                 // Summary / Totals block (Right-aligned)
-                const sumX = 360;
-                const sumValX = pageWidth - 30;
+                const sumBoxWidth = 210;
+                const sumX = pageWidth - 30 - sumBoxWidth;
                 doc.font('Helvetica').fontSize(8.5).fillColor('#475569');
 
                 doc.text('Subtotal:', sumX, currentY);
-                doc.text(fmtCurrency(po.totalAmount || po.subtotal || 0, currency), 360, currentY, { align: 'right', width: sumValX - sumX });
+                doc.text(fmtCurrency(po.subtotal || po.totalAmount || 0, currency), sumX, currentY, { align: 'right', width: sumBoxWidth });
                 currentY += 13;
 
-                // Grand Total Row
-                doc.rect(sumX - 8, currentY - 3, sumValX - sumX + 16, 20).fill('#065F46');
+                if (po.taxAmount > 0 || po.totalTax > 0) {
+                    doc.text('VAT / Taxes:', sumX, currentY);
+                    doc.text(fmtCurrency(po.taxAmount || po.totalTax, currency), sumX, currentY, { align: 'right', width: sumBoxWidth });
+                    currentY += 13;
+                }
+
+                // Grand Total Highlighted Box
+                doc.rect(sumX - 6, currentY - 3, sumBoxWidth + 6, 20).fill('#065F46');
                 doc.font('Helvetica-Bold').fontSize(10).fillColor('#FFFFFF');
                 doc.text('TOTAL AMOUNT:', sumX, currentY + 3);
-                doc.text(fmtCurrency(po.grandTotal || po.totalAmount || 0, currency), sumX, currentY + 3, { align: 'right', width: sumValX - sumX });
-                currentY += 35;
+                doc.text(fmtCurrency(po.grandTotal || po.totalAmount || 0, currency), sumX, currentY + 3, { align: 'right', width: sumBoxWidth });
+                currentY += 32;
 
-                // Signatures
-                const sigY = Math.max(currentY + 10, doc.page.height - 95);
+                // Notes / Terms
+                if (po.notes || po.termsAndConditions) {
+                    doc.font('Helvetica-Bold').fontSize(8).fillColor('#065F46').text('SPECIAL INSTRUCTIONS & TERMS:', 30, currentY);
+                    doc.font('Helvetica').fontSize(7.5).fillColor('#475569').text(po.notes || po.termsAndConditions, 30, currentY + 11, { width: 310 });
+                }
+
+                // Signatures & Official Stamp
+                const sigY = Math.max(currentY + 25, doc.page.height - 95);
                 doc.strokeColor('#CBD5E1').lineWidth(0.8);
 
-                doc.moveTo(40, sigY + 30).lineTo(200, sigY + 30).stroke();
-                doc.font('Helvetica-Bold').fontSize(8).fillColor('#475569').text('Procurement Officer', 40, sigY + 35, { width: 160, align: 'center' });
-                doc.font('Helvetica').fontSize(7).fillColor('#94A3B8').text('Authentic Lanka Exports (Pvt) Ltd', 40, sigY + 45, { width: 160, align: 'center' });
+                // 1. Procurement Officer
+                doc.moveTo(35, sigY + 25).lineTo(180, sigY + 25).stroke();
+                doc.font('Helvetica-Bold').fontSize(8).fillColor('#334155').text('Procurement Officer', 35, sigY + 30, { width: 145, align: 'center' });
+                doc.font('Helvetica').fontSize(7).fillColor('#64748B').text(brand.name, 35, sigY + 40, { width: 145, align: 'center' });
 
-                doc.moveTo(pageWidth - 200, sigY + 30).lineTo(pageWidth - 40, sigY + 30).stroke();
-                doc.font('Helvetica-Bold').fontSize(8).fillColor('#475569').text('Operations / Factory Approval', pageWidth - 200, sigY + 35, { width: 160, align: 'center' });
-                doc.font('Helvetica').fontSize(7).fillColor('#94A3B8').text('Date: ________________________', pageWidth - 200, sigY + 45, { width: 160, align: 'center' });
+                // 2. Receiving / Warehouse Authority
+                doc.moveTo(215, sigY + 25).lineTo(360, sigY + 25).stroke();
+                doc.font('Helvetica-Bold').fontSize(8).fillColor('#334155').text('Warehouse / Receiving QA', 215, sigY + 30, { width: 145, align: 'center' });
+                doc.font('Helvetica').fontSize(7).fillColor('#64748B').text('Signature & Date', 215, sigY + 40, { width: 145, align: 'center' });
 
-                // Footer
+                // 3. Management Approval
+                doc.moveTo(395, sigY + 25).lineTo(pageWidth - 35, sigY + 25).stroke();
+                doc.font('Helvetica-Bold').fontSize(8).fillColor('#334155').text('Authorized Approval', 395, sigY + 30, { width: 165, align: 'center' });
+                doc.font('Helvetica').fontSize(7).fillColor('#64748B').text('Management / Director', 395, sigY + 40, { width: 165, align: 'center' });
+
+                // Multi-page Safe Footers
                 const range = doc.bufferedPageRange();
                 for (let i = range.start; i < range.start + range.count; i++) {
                     doc.switchToPage(i);
-                    doc.fontSize(7).fillColor('#94A3B8').text(
-                        `Authentic Lanka Exports (Pvt) Ltd  ·  PO: ${po.poNumber}  ·  Page ${i + 1} of ${range.count}`,
-                        0,
+                    doc.page.margins.bottom = 0;
+                    doc.strokeColor('#E2E8F0').lineWidth(0.5).moveTo(30, doc.page.height - 24).lineTo(pageWidth - 30, doc.page.height - 24).stroke();
+                    doc.fontSize(6.5).fillColor('#94A3B8').text(
+                        `${brand.name}  ·  PO No: ${po.poNumber || '—'}  ·  Page ${i + 1} of ${range.count}  ·  Generated on ${new Date().toLocaleDateString('en-LK')}`,
+                        30,
                         doc.page.height - 18,
-                        { align: 'center', width: doc.page.width }
+                        { align: 'center', width: pageWidth - 60, lineBreak: false }
                     );
                 }
 
@@ -765,6 +919,10 @@ class ReportService {
 
             try {
                 const result = doc.table(table, {
+                    x: 30,
+                    width: 535,
+                    padding: 5,
+                    columnSpacing: 3,
                     prepareHeader: () => doc.font('Helvetica-Bold').fontSize(8).fillColor('#065F46'),
                     prepareRow: () => doc.font('Helvetica').fontSize(7.5).fillColor('#1E293B'),
                 });

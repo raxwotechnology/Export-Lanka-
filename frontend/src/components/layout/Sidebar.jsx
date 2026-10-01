@@ -508,7 +508,7 @@ function CollapsedRailItem({ module, pathname, onItemClick }) {
                         </span>
                     </div>
 
-                    <div className="space-y-1 max-h-[340px] overflow-y-auto">
+                    <div className="space-y-1 max-h-[340px] overflow-y-auto no-scrollbar">
                         {module.items.map((item) => {
                             const ItemIcon = item.icon;
                             const isCurrentActive = isItemActive(item, pathname);
@@ -831,7 +831,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
                 )}
 
                 {/* ── Scrollable Navigation Container ── */}
-                <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1 scrollbar-thin">
+                <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1 no-scrollbar">
                     {/* Collapsed Rail View (Desktop Only) */}
                     {isCollapsed && !isOpen ? (
                         <div className="space-y-1">
