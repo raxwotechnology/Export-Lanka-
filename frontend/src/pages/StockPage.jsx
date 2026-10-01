@@ -590,7 +590,7 @@ export default function StockPage({ initialTab = 'balances' }) {
                                     placeholder="Search by name, SKU, code, batch..."
                                     value={filters.search}
                                     onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value, page: 1 }))}
-                                    className="w-full h-10 pl-9.5 pr-8 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 hover:border-slate-400 transition"
+                                    className="w-full h-10 pl-10 pr-8 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 hover:border-slate-400 transition"
                                 />
                                 {filters.search && (
                                     <button

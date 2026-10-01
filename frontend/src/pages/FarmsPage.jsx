@@ -503,12 +503,13 @@ export default function FarmsPage({ initialTab = 'harvests' }) {
                     {/* Filters bar */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 pb-3 border-b border-gray-100">
                         <div className="md:col-span-3 relative">
-                            <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
-                            <Input
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <input
+                                type="text"
                                 placeholder="Search by farm name, code, or location..."
                                 value={farmSearch}
                                 onChange={(e) => setFarmSearch(e.target.value)}
-                                className="pl-9"
+                                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-500 text-sm"
                             />
                         </div>
                         <div>
