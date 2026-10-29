@@ -1,0 +1,11 @@
+{
+  "watch": ["src/"],
+  "ext": "js,mjs,cjs",
+  "ignore": [
+    "backups/**",
+    "data/**",
+    "**/*.xlsx",
+    "**/*.json",
+    "node_modules/**"
+  ]
+}

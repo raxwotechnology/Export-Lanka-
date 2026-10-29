@@ -7,9 +7,11 @@ import {
     exportMonthlyPerformance,
     exportModuleData
 } from '../controllers/exportController.js';
+import { exportMasterReport } from '../controllers/masterReportController.js';
 
 const router = express.Router();
 
+router.get('/master-report', protect, exportMasterReport);
 router.get('/petty-cash', protect, exportPettyCash);
 router.get('/production', protect, exportProduction);
 router.get('/pnl', protect, exportPnL);
